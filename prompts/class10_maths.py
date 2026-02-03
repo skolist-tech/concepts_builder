@@ -1,6 +1,6 @@
-'''
+"""
 This contains the prompt for decomposing a chapter of ncert class 10 maths into concepts.
-'''
+"""
 
 # NCERT_CLASS_10_Maths = f'''
 #     The chapter's pdf is already structures in a format of topics.
@@ -11,9 +11,8 @@ This contains the prompt for decomposing a chapter of ncert class 10 maths into 
 #     There must be some paragraphs, diagrams in a topic. Use them to define concepts.
 #     Concepts are smallest unit of knowledge, in this system.
 #     You should not miss any concept.
-#     Follow the given schema for outputting. 
+#     Follow the given schema for outputting.
 #     '''
-
 
 
 # NCERT_CLASS_6_SCIENCE = f'''
@@ -58,9 +57,7 @@ This contains the prompt for decomposing a chapter of ncert class 10 maths into 
 # Accuracy, completeness, and strict adherence to the PDF content are CRITICAL.
 # '''
 
-
-
-NCERT_GEN = f'''You are given an NCERT textbook chapter PDF.
+NCERT_GEN = f"""You are given an NCERT textbook chapter PDF.
 
 The chapter is already structured using chapter titles, topics, and sub-topics.
 Your task is to extract the content in the following hierarchy:
@@ -91,4 +88,4 @@ OUTPUT RULES:
 GOAL:
 This structured data will be used for concept-wise question generation and exam paper creation.
 Accuracy, completeness, and strict adherence to the chapter content are mandatory.
-'''
+"""

@@ -19,3 +19,7 @@ helper/data.csv
 
 # Sensitive Env variables
 .env
+
+# logs
+app.log
+logs/

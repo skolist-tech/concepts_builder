@@ -6,6 +6,7 @@ class Concept(BaseModel):
     """
     This class represents a concept.
     """
+
     name: str = Field(description="Name of the concept, in 2-3 words")
     description: str = Field(
         description="Description of the concept, in 1-2 lines. 3-4 only if required in rare case"
@@ -23,7 +24,7 @@ class Topic(BaseModel):
         description="Description of the topic, in 1-2 lines. 3-4 only if required in rare case"
     )
     concepts: List[Concept] = Field(description="List of concepts in this topic")
-    position:int = Field(description="Position of the topic in the chapter")
+    position: int = Field(description="Position of the topic in the chapter")
 
 
 class Chapter(BaseModel):
@@ -37,4 +38,3 @@ class Chapter(BaseModel):
     )
     topics: List[Topic] = Field(description="List of topics in this chapter")
     # position: int = Field(description="Position of the chapter in the book/course")
-
