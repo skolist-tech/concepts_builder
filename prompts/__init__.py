@@ -7,8 +7,10 @@ The prompts tells to the agent how to decomposen a chapter of this book into
 concepts and topics.
 '''
 
-from prompts.class10_maths import NCERT_CLASS_10_Maths
+#from prompts.class10_maths import NCERT_CLASS_10_Maths
+from prompts.class10_maths import NCERT_GEN
 
 __all__ = [
-    "NCERT_CLASS_10_Maths"
+   # "NCERT_CLASS_10_Maths",
+    "NCERT_GEN"
 ]
