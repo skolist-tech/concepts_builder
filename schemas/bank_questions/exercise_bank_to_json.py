@@ -1,32 +1,33 @@
+
 import os
 import json
 import logging
 
-from schemas.bank_questions.question_bank_schema import SolvedExamplesBank
+from schemas.bank_questions.question_bank_schema import ExerciseQuestionsBank
 
 logger = logging.getLogger(__name__)
 
-def solved_bank_to_json(solved_bank: SolvedExamplesBank ) -> str:
+def exercise_bank_to_json(exercise_bank: ExerciseQuestionsBank ) -> str:
     """
-    Convert a SolvedExamplesBank object to a JSON string.
+    Convert a ExerciseQuestionsBank object to a JSON string.
 
     Args:
-        solved_bank (SolvedExamplesBank): The solved examples bank object.
+        exercise_bank (ExerciseQuestionsBank): The exercise questions bank object.
 
     Returns:
-        str: JSON string representation of the solved examples bank.
+        str: JSON string representation of the exercise questions bank.
     """
-    return solved_bank.model_dump_json(indent=4)
+    return exercise_bank.model_dump_json(indent=4)
 
-def save_solved_bank_json(solved_bank: SolvedExamplesBank, path: str):
+def save_exercise_bank_json(exercise_bank: ExerciseQuestionsBank, path: str):
     """
-    Save the SolvedExamplesBank object as a JSON file.
+    Save the ExerciseQuestionsBank object as a JSON file.
 
     Args:
-        solved_bank (SolvedExamplesBank): The solved examples bank object.
+        exercise_bank (ExerciseQuestionsBank): The exercise questions bank object.
         path (str): The file path to save the JSON data.
     """
-    json_data = solved_bank_to_json(solved_bank)
+    json_data = exercise_bank_to_json(exercise_bank)
     base_dir = os.path.dirname(path)
     if not os.path.exists(base_dir):
         os.makedirs(base_dir)
@@ -58,15 +59,15 @@ def _sanitize_question(question: dict) -> dict:
     return question
 
 
-def load_solved_bank_json(path: str) -> SolvedExamplesBank:
+def load_exercise_bank_json(path: str) -> ExerciseQuestionsBank:
     """
-    Load a SolvedExamplesBank object from a JSON file.
+    Load a ExerciseQuestionsBank object from a JSON file.
 
     Args:
         path (str): The file path to load the JSON data from.
 
     Returns:
-        SolvedExamplesBank: The parsed SolvedExamplesBank object.
+        ExerciseQuestionsBank: The parsed ExerciseQuestionsBank object.
     
     Raises:
         FileNotFoundError: If the JSON file does not exist.
@@ -79,11 +80,11 @@ def load_solved_bank_json(path: str) -> SolvedExamplesBank:
         data = json.load(f)
     
     # Sanitize each question to handle null values
-    if "solved_examples_questions" in data:
-        data["solved_examples_questions"] = [
-            _sanitize_question(q) for q in data["solved_examples_questions"]
+    if "exercise_questions" in data:
+        data["exercise_questions"] = [
+            _sanitize_question(q) for q in data["exercise_questions"]
         ]
     
-    solved_bank = SolvedExamplesBank.model_validate(data)
-    logger.info(f"Loaded SolvedExamplesBank from {path} with {len(solved_bank.solved_examples_questions)} questions")
-    return solved_bank
+    exercise_bank = ExerciseQuestionsBank.model_validate(data)
+    logger.info(f"Loaded ExerciseQuestionsBank from {path} with {len(exercise_bank.exercise_questions)} questions")
+    return exercise_bank

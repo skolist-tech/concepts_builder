@@ -1,7 +1,9 @@
 from agents.concept_generator import generate_concepts
 from agents.solved_examples_generator import generate_solved_examples
+from agents.exercise_questions_generator import generate_exercise_questions
 
 __all__ = [
     "generate_concepts",
-    "generate_solved_examples"
+    "generate_solved_examples",
+    "generate_exercise_questions"
 ]

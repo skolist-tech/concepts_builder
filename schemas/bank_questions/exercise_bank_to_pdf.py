@@ -5,17 +5,17 @@ from typing import Optional
 
 from playwright.async_api import async_playwright
 
-from schemas.bank_questions.question_bank_schema import SolvedExamplesBank, SolvedExample
+from schemas.bank_questions.question_bank_schema import ExerciseQuestionsBank, ExerciseQuestion
 
 logger = logging.getLogger(__name__)
 
 
-async def save_solved_bank_pdf(bank: SolvedExamplesBank, path: str) -> None:
+async def save_exercise_bank_pdf(bank: ExerciseQuestionsBank, path: str) -> None:
     """
-    Generate a PDF from a SolvedExamplesBank object and save it to the given path.
+    Generate a PDF from a ExerciseQuestionsBank object and save it to the given path.
     
     Args:
-        bank: The SolvedExamplesBank object containing all solved examples
+        bank: The ExerciseQuestionsBank object containing all exercise questions
         path: The file path where the PDF will be saved
     """
     # Ensure directory exists
@@ -25,7 +25,7 @@ async def save_solved_bank_pdf(bank: SolvedExamplesBank, path: str) -> None:
         logger.info(f"Created directory: {base_dir}")
 
     # Generate HTML content
-    html_content = generate_solved_bank_html(bank)
+    html_content = generate_exercise_bank_html(bank)
 
     # Convert to PDF using Playwright
     async with async_playwright() as p:
@@ -44,15 +44,15 @@ async def save_solved_bank_pdf(bank: SolvedExamplesBank, path: str) -> None:
     logger.info(f"PDF saved to: {path}")
 
 
-def save_solved_bank_pdf_sync(bank: SolvedExamplesBank, path: str) -> None:
+def save_exercise_bank_pdf_sync(bank: ExerciseQuestionsBank, path: str) -> None:
     """
-    Synchronous wrapper for save_solved_bank_pdf.
+    Synchronous wrapper for save_exercise_bank_pdf.
     """
-    asyncio.run(save_solved_bank_pdf(bank, path))
+    asyncio.run(save_exercise_bank_pdf(bank, path))
 
 
-def generate_solved_bank_html(bank: SolvedExamplesBank) -> str:
-    """Generate HTML content for the solved examples bank."""
+def generate_exercise_bank_html(bank: ExerciseQuestionsBank) -> str:
+    """Generate HTML content for the exercise questions bank."""
     
     css = """
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -287,7 +287,7 @@ def generate_solved_bank_html(bank: SolvedExamplesBank) -> str:
 
     questions_html = "".join(
         render_question(q, idx + 1) 
-        for idx, q in enumerate(bank.solved_examples_questions)
+        for idx, q in enumerate(bank.exercise_questions)
     )
 
     html = f"""
@@ -304,8 +304,8 @@ def generate_solved_bank_html(bank: SolvedExamplesBank) -> str:
         <div class="page">
             <div class="header">
                 <div class="chapter-name">{bank.chapter_name}</div>
-                <div class="subtitle">Solved Examples</div>
-                <div class="question-count">Total Questions: {len(bank.solved_examples_questions)}</div>
+                <div class="subtitle">Exercise Questions</div>
+                <div class="question-count">Total Questions: {len(bank.exercise_questions)}</div>
             </div>
             
             {questions_html}
@@ -317,7 +317,7 @@ def generate_solved_bank_html(bank: SolvedExamplesBank) -> str:
     return html
 
 
-def render_question(q: SolvedExample, display_idx: int) -> str:
+def render_question(q: ExerciseQuestion, display_idx: int) -> str:
     """Render a single question as HTML."""
     
     # Question type and difficulty badges

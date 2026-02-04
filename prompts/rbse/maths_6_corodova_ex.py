@@ -1,11 +1,13 @@
-MATHS_6_CORODOVA_SOLVED_EG_PROMPT = f"""
-You are provided with a chapter pdf from a mathematics textbook and a list of concepts from that chapter. Your task is to identify and extract all solved examples from the chapter PDF, also wherever possible, link each solved example to the relevant concept(s) from the provided list.
+MATHS_6_CORODOVA_EXERCISE_PROMPT = f"""
+You are provided with a chapter pdf from a mathematics textbook and a list of concepts from that chapter. Your task is to identify and extract all exercises from the chapter PDF, also wherever possible, link each exercise to the relevant concept(s) from the provided list.
+Don't take solved examples, only take exercises.
 
 STRICT INSTRUCTIONS:
 - Use ONLY the information present in the chapter PDF.
 - DO NOT use prior knowledge or add any external information.
-- If for a solved example, Figure or Image is referenced or needed, then flag it as 1 in the is_image_needed field.
+- If for an exercise, Figure or Image is referenced or needed, then flag it as 1 in the is_image_needed field.
 - The mapping of the concepts should be word to word from the provided concepts list. Don't change the wording of any concepts, it will lead to mismatch during later processing.
+
 
 OUTPUT RULES:
 - Follow the given output schema EXACTLY.
@@ -21,4 +23,6 @@ LATEX_INSTRUCTIONS:
 - Never output HTML tags like <br>, <p>, <span>, etc.; return only plain text with \n for line breaks.
 Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
         If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
+
+
 """

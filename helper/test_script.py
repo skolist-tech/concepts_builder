@@ -4,8 +4,12 @@ import logging
 import pandas as pd
 from prompts import NCERT_GEN
 
-from agents import generate_concepts, generate_solved_examples
-from schemas import Chapter, save_csv, SolvedExamplesBank, save_solved_bank_json
+from agents import generate_concepts, generate_solved_examples, generate_exercise_questions
+from schemas import (
+    Chapter, save_csv, SolvedExamplesBank, save_solved_bank_json,
+    ExerciseQuestionsBank, save_exercise_bank_json
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -76,4 +80,24 @@ async def process_chapter_for_solved_examples(
     output: SolvedExamplesBank = await generate_solved_examples(prompt=prompt, pdf_path=chapter_pdf_path, concepts_list=concepts_list)
     save_solved_bank_json(output, output_json_path)
     logger.info(f"Solved examples saved to JSON at: {output_json_path}")
+    return output
+
+async def process_chapter_for_exercise_questions(
+    chapter_pdf_path: str,
+    prompt: str,
+    concepts_csv_path: str,
+    output_json_path : str) -> ExerciseQuestionsBank:
+
+    if not os.path.exists(chapter_pdf_path):
+        raise FileNotFoundError(f"PDF file not found at {chapter_pdf_path}")
+    if not os.path.exists(concepts_csv_path):
+        raise FileNotFoundError(f"Concepts CSV file not found at {concepts_csv_path}")
+    df = pd.read_csv(concepts_csv_path)
+    concepts_list = df['concept_name'].dropna().tolist()
+    if not concepts_list:
+        raise ValueError("Concepts list extracted from CSV is empty.")
+    logger.info(f"Processing chapter for exercise questions from PDF: {chapter_pdf_path}")
+    output: ExerciseQuestionsBank = await generate_exercise_questions(prompt=prompt, pdf_path=chapter_pdf_path, concepts_list=concepts_list)
+    save_exercise_bank_json(output, output_json_path)
+    logger.info(f"Exercise questions saved to JSON at: {output_json_path}")
     return output
