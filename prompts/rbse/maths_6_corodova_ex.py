@@ -6,6 +6,7 @@ STRICT INSTRUCTIONS:
 - Use ONLY the information present in the chapter PDF.
 - DO NOT use prior knowledge or add any external information.
 - If for an exercise, Figure or Image is referenced or needed, then flag it as 1 in the is_image_needed field.
+  Only flag if image is in the question related fields, if figure draw etc. if required in answer, then don't flag it as 1.
 - The mapping of the concepts should be word to word from the provided concepts list. Don't change the wording of any concepts, it will lead to mismatch during later processing.
 
 
