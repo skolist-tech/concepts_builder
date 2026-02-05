@@ -1,0 +1,155 @@
+"""
+Question extraction pipeline.
+
+Handles the workflow for extracting solved examples and exercise questions from chapter PDFs.
+"""
+
+import logging
+from pathlib import Path
+from typing import Optional, List
+
+import pandas as pd
+
+from agents import generate_solved_examples, generate_exercise_questions
+from schemas import SolvedExamplesBank, ExerciseQuestionsBank
+from schemas import save_solved_bank_json, save_exercise_bank_json
+from utils.paths import (
+    get_concepts_csv_path,
+    get_solved_examples_json_path,
+    get_exercise_questions_json_path,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def load_concepts_from_csv(csv_path: Path) -> List[str]:
+    """
+    Load concept names from a concepts CSV file.
+    
+    Args:
+        csv_path: Path to the concepts CSV file.
+    
+    Returns:
+        List of concept names.
+    
+    Raises:
+        FileNotFoundError: If the CSV file doesn't exist.
+        ValueError: If no concepts are found in the CSV.
+    """
+    csv_path = Path(csv_path)
+    
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Concepts CSV file not found: {csv_path}")
+    
+    df = pd.read_csv(csv_path)
+    concepts_list = df['concept_name'].dropna().tolist()
+    
+    if not concepts_list:
+        raise ValueError(f"No concepts found in CSV: {csv_path}")
+    
+    logger.info(f"Loaded {len(concepts_list)} concepts from {csv_path}")
+    return concepts_list
+
+
+async def process_chapter_for_solved_examples(
+    chapter_pdf_path: Path,
+    prompt: str,
+    concepts_csv_path: Optional[Path] = None,
+    output_json_path: Optional[Path] = None
+) -> SolvedExamplesBank:
+    """
+    Process a chapter PDF to extract solved examples and save to JSON.
+    
+    Args:
+        chapter_pdf_path: Path to the chapter PDF file.
+        prompt: The prompt for solved examples extraction.
+        concepts_csv_path: Path to the concepts CSV. Auto-generated if not provided.
+        output_json_path: Path for the output JSON. Auto-generated if not provided.
+    
+    Returns:
+        The generated SolvedExamplesBank object.
+    
+    Raises:
+        FileNotFoundError: If the PDF or concepts CSV doesn't exist.
+        ValueError: If extraction fails.
+    """
+    chapter_pdf_path = Path(chapter_pdf_path)
+    
+    if not chapter_pdf_path.exists():
+        raise FileNotFoundError(f"PDF file not found: {chapter_pdf_path}")
+    
+    if concepts_csv_path is None:
+        concepts_csv_path = get_concepts_csv_path(chapter_pdf_path)
+    
+    if output_json_path is None:
+        output_json_path = get_solved_examples_json_path(chapter_pdf_path)
+    
+    # Load concepts from CSV
+    concepts_list = load_concepts_from_csv(concepts_csv_path)
+    
+    logger.info(f"Processing chapter for solved examples: {chapter_pdf_path}")
+    
+    # Generate solved examples using the agent
+    solved_bank: SolvedExamplesBank = await generate_solved_examples(
+        prompt=prompt,
+        pdf_path=str(chapter_pdf_path),
+        concepts_list=concepts_list
+    )
+    
+    # Save to JSON
+    save_solved_bank_json(solved_bank, str(output_json_path))
+    logger.info(f"Solved examples saved to JSON: {output_json_path}")
+    
+    return solved_bank
+
+
+async def process_chapter_for_exercise_questions(
+    chapter_pdf_path: Path,
+    prompt: str,
+    concepts_csv_path: Optional[Path] = None,
+    output_json_path: Optional[Path] = None
+) -> ExerciseQuestionsBank:
+    """
+    Process a chapter PDF to extract exercise questions and save to JSON.
+    
+    Args:
+        chapter_pdf_path: Path to the chapter PDF file.
+        prompt: The prompt for exercise questions extraction.
+        concepts_csv_path: Path to the concepts CSV. Auto-generated if not provided.
+        output_json_path: Path for the output JSON. Auto-generated if not provided.
+    
+    Returns:
+        The generated ExerciseQuestionsBank object.
+    
+    Raises:
+        FileNotFoundError: If the PDF or concepts CSV doesn't exist.
+        ValueError: If extraction fails.
+    """
+    chapter_pdf_path = Path(chapter_pdf_path)
+    
+    if not chapter_pdf_path.exists():
+        raise FileNotFoundError(f"PDF file not found: {chapter_pdf_path}")
+    
+    if concepts_csv_path is None:
+        concepts_csv_path = get_concepts_csv_path(chapter_pdf_path)
+    
+    if output_json_path is None:
+        output_json_path = get_exercise_questions_json_path(chapter_pdf_path)
+    
+    # Load concepts from CSV
+    concepts_list = load_concepts_from_csv(concepts_csv_path)
+    
+    logger.info(f"Processing chapter for exercise questions: {chapter_pdf_path}")
+    
+    # Generate exercise questions using the agent
+    exercise_bank: ExerciseQuestionsBank = await generate_exercise_questions(
+        prompt=prompt,
+        pdf_path=str(chapter_pdf_path),
+        concepts_list=concepts_list
+    )
+    
+    # Save to JSON
+    save_exercise_bank_json(exercise_bank, str(output_json_path))
+    logger.info(f"Exercise questions saved to JSON: {output_json_path}")
+    
+    return exercise_bank

@@ -1,15 +1,16 @@
 [project]
 name = "concepts-builder"
 version = "0.1.0"
-description = "Add your description here"
+description = "Extract structured educational content from textbook PDFs using AI"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "dotenv>=0.9.9",
     "google-genai>=1.60.0",
     "pandas>=3.0.0",
     "playwright>=1.58.0",
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.0.0",
     "ruff>=0.14.14",
     "supabase>=2.27.3",
     "uuid6>=2025.0.1",

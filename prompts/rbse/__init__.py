@@ -1,10 +1,16 @@
-from .maths_6_corodova import MATHS_6_CORODOVA_PROMPT
-from .maths_6_corodova_solved_eg import MATHS_6_CORODOVA_SOLVED_EG_PROMPT
+"""
+RBSE (Rajasthan Board) prompts package.
 
-from .maths_6_corodova_ex import MATHS_6_CORODOVA_EXERCISE_PROMPT
+Contains prompts for RBSE textbooks including:
+- Maths Class 6 (Corodova edition)
+"""
+
+from prompts.rbse.maths_6_corodova import MATHS_6_CORODOVA_PROMPT
+from prompts.rbse.maths_6_corodova_solved_eg import MATHS_6_CORODOVA_SOLVED_EG_PROMPT
+from prompts.rbse.maths_6_corodova_ex import MATHS_6_CORODOVA_EXERCISE_PROMPT
 
 __all__ = [
     "MATHS_6_CORODOVA_PROMPT",
     "MATHS_6_CORODOVA_SOLVED_EG_PROMPT",
-    "MATHS_6_CORODOVA_EXERCISE_PROMPT"
+    "MATHS_6_CORODOVA_EXERCISE_PROMPT",
 ]

@@ -1,22 +1,42 @@
 """
-This agent takes a prompt and a pdf path as input.
-It uses the prompt to generate Exercise Questions from the pdf mapped to the concepts form the list provided.
-It returns a ExerciseQuestionsBank object.
+Exercise Questions Generator Agent.
+
+Takes a prompt, PDF path, and concepts list as input, uses Gemini to 
+generate exercise questions mapped to concepts, returns an ExerciseQuestionsBank object.
 """
 
 import os
 import logging
 
-from google import genai
 from google.genai import types
 
+from config import settings
+from agents.base import get_gemini_client, read_pdf_as_part, format_concepts_list
 from schemas import ExerciseQuestionsBank
 
 logger = logging.getLogger(__name__)
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-async def generate_exercise_questions(prompt: str, pdf_path: str, concepts_list : list[str]) -> ExerciseQuestionsBank:
+async def generate_exercise_questions(
+    prompt: str, 
+    pdf_path: str, 
+    concepts_list: list[str]
+) -> ExerciseQuestionsBank:
+    """
+    Generate exercise questions from a chapter PDF using Gemini.
+    
+    Args:
+        prompt: The prompt instructing how to extract exercise questions.
+        pdf_path: Path to the chapter PDF file.
+        concepts_list: List of concept names to map questions to.
+    
+    Returns:
+        An ExerciseQuestionsBank object containing exercise questions.
+    
+    Raises:
+        ValueError: If inputs are invalid or response cannot be parsed.
+        FileNotFoundError: If the PDF file doesn't exist.
+    """
     if not concepts_list:
         raise ValueError("concepts_list cannot be empty.")
     if not prompt:
@@ -26,30 +46,34 @@ async def generate_exercise_questions(prompt: str, pdf_path: str, concepts_list 
     if not os.path.exists(pdf_path):
         raise FileNotFoundError(f"PDF file not found at {pdf_path}")
     
-    with open(pdf_path, "rb") as f:
-        part = types.Part.from_bytes(data=f.read(), mime_type="application/pdf")
-        logger.info(f"PDF read successfully from path : {pdf_path}")
+    client = get_gemini_client()
+    part = read_pdf_as_part(pdf_path)
     
-    # Format concepts list to include in the prompt
-    concepts_text = "\n\nCONCEPTS LIST:\n" + "\n".join(f"- {concept}" for concept in concepts_list)
-    full_prompt = prompt + concepts_text
+    # Format concepts list and append to prompt
+    full_prompt = prompt + format_concepts_list(concepts_list)
     
-    responce = await client.aio.models.generate_content(
-        model="gemini-2.5-flash",
+    response = await client.aio.models.generate_content(
+        model=settings.gemini_model,
         contents=[full_prompt, part],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=ExerciseQuestionsBank,
         ),
     )
+    
     logger.info("Response generated successfully")
-    exercise_questions_bank: ExerciseQuestionsBank = responce.parsed
+    exercise_questions_bank: ExerciseQuestionsBank = response.parsed
     
     if exercise_questions_bank is None:
-        logger.error(f"Failed to parse response for {pdf_path}. Raw response text: {responce.text}")
-        raise ValueError(f"Failed to parse response from Gemini for {pdf_path}. The model might have been blocked or returned invalid JSON.")
+        logger.error(f"Failed to parse response for {pdf_path}. Raw response text: {response.text}")
+        raise ValueError(
+            f"Failed to parse response from Gemini for {pdf_path}. "
+            "The model might have been blocked or returned invalid JSON."
+        )
 
     logger.info("ExerciseQuestionsBank parsed successfully")
     logger.info(
-        f"Generated ExerciseQuestionsBank with {len(exercise_questions_bank.exercise_questions)} exercise questions for chapter : {exercise_questions_bank.chapter_name}.")
+        f"Generated ExerciseQuestionsBank with {len(exercise_questions_bank.exercise_questions)} "
+        f"exercise questions for chapter: {exercise_questions_bank.chapter_name}."
+    )
     return exercise_questions_bank
