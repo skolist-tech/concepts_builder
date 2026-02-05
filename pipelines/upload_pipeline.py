@@ -83,6 +83,58 @@ def create_supabase_client() -> supabase.Client:
     return supabase.Client(url, key)
 
 
+async def fetch_chapter_id_by_name(
+    client: supabase.Client,
+    subject_id: str,
+    chapter_name: str
+) -> Optional[str]:
+    """
+    Fetch chapter ID by chapter name for a subject.
+    
+    Args:
+        client: Supabase client instance.
+        subject_id: The subject UUID.
+        chapter_name: The chapter name to look up.
+    
+    Returns:
+        The chapter UUID or None if not found.
+    """
+    try:
+        def _fetch():
+            return (
+                client.table("chapters")
+                .select("id, name")
+                .eq("subject_id", subject_id)
+                .execute()
+            )
+        
+        response = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+        
+        if hasattr(response, 'data') and response.data:
+            # Try exact match first
+            for chapter in response.data:
+                if chapter['name'].lower() == chapter_name.lower():
+                    logger.info(f"Found chapter_id for '{chapter_name}': {chapter['id']}")
+                    return chapter['id']
+            
+            # Try partial match (e.g., "Knowing Our Numbers" in "01_knowing_our_numbers")
+            chapter_name_lower = chapter_name.lower().replace("_", " ")
+            for chapter in response.data:
+                if chapter['name'].lower() in chapter_name_lower or chapter_name_lower in chapter['name'].lower():
+                    logger.info(f"Found chapter_id for '{chapter_name}' (partial match): {chapter['id']}")
+                    return chapter['id']
+            
+            logger.warning(f"Chapter '{chapter_name}' not found for subject_id {subject_id}")
+            logger.debug(f"Available chapters: {[c['name'] for c in response.data]}")
+        else:
+            logger.warning(f"No chapters found for subject_id {subject_id}")
+            
+    except Exception as e:
+        logger.error(f"Failed to fetch chapter_id: {e}")
+    
+    return None
+
+
 async def fetch_concept_id_mapping(
     client: supabase.Client,
     subject_id: str
@@ -126,7 +178,8 @@ async def fetch_concept_id_mapping(
 def question_to_db_record(
     question: BaseQuestion,
     subject_id: str,
-    is_solved_example: bool
+    is_solved_example: bool,
+    chapter_id: Optional[str] = None
 ) -> dict:
     """
     Convert a question object to a database record.
@@ -135,6 +188,7 @@ def question_to_db_record(
         question: The question object (SolvedExample or ExerciseQuestion).
         subject_id: The subject UUID.
         is_solved_example: True if this is a solved example, False for exercise.
+        chapter_id: The chapter UUID (optional).
     
     Returns:
         Dictionary ready for database insertion.
@@ -158,6 +212,7 @@ def question_to_db_record(
     return {
         "id": question_id,
         "subject_id": subject_id,
+        "chapter_id": chapter_id,
         "question_text": question.question_text,
         "option1": question.option1,
         "option2": question.option2,
@@ -186,7 +241,8 @@ async def upload_questions_to_supabase(
     client: supabase.Client,
     questions: List[BaseQuestion],
     subject_id: str,
-    is_solved_example: bool
+    is_solved_example: bool,
+    chapter_name: Optional[str] = None
 ) -> dict:
     """
     Upload a list of questions to Supabase.
@@ -196,6 +252,7 @@ async def upload_questions_to_supabase(
         questions: List of question objects.
         subject_id: The subject UUID.
         is_solved_example: True if these are solved examples.
+        chapter_name: The chapter name to look up chapter_id.
     
     Returns:
         Statistics dictionary with upload results.
@@ -208,6 +265,13 @@ async def upload_questions_to_supabase(
             "maps_upserted": 0,
         }
     
+    # Fetch chapter_id if chapter_name is provided
+    chapter_id = None
+    if chapter_name:
+        chapter_id = await fetch_chapter_id_by_name(client, subject_id, chapter_name)
+        if not chapter_id:
+            logger.warning(f"Could not find chapter_id for '{chapter_name}', proceeding without it")
+    
     # Fetch concept mapping
     concept_to_id = await fetch_concept_id_mapping(client, subject_id)
     
@@ -217,7 +281,7 @@ async def upload_questions_to_supabase(
     duplicate_count = 0
     
     for q in questions:
-        record = question_to_db_record(q, subject_id, is_solved_example)
+        record = question_to_db_record(q, subject_id, is_solved_example, chapter_id)
         
         # Deduplicate questions by ID
         if record['id'] not in questions_by_id:
@@ -294,11 +358,15 @@ async def upload_solved_examples_to_supabase(
         logger.warning("Empty solved examples bank")
         return {"questions_total": 0, "questions_upserted": 0, "maps_total": 0, "maps_upserted": 0}
     
+    # Get chapter_name from the bank if available
+    chapter_name = getattr(solved_bank, 'chapter_name', None)
+    
     return await upload_questions_to_supabase(
         client=client,
         questions=solved_bank.solved_examples_questions,
         subject_id=subject_id,
         is_solved_example=True,
+        chapter_name=chapter_name,
     )
 
 
@@ -312,11 +380,15 @@ async def upload_exercise_questions_to_supabase(
         logger.warning("Empty exercise questions bank")
         return {"questions_total": 0, "questions_upserted": 0, "maps_total": 0, "maps_upserted": 0}
     
+    # Get chapter_name from the bank if available
+    chapter_name = getattr(exercise_bank, 'chapter_name', None)
+    
     return await upload_questions_to_supabase(
         client=client,
         questions=exercise_bank.exercise_questions,
         subject_id=subject_id,
         is_solved_example=False,
+        chapter_name=chapter_name,
     )
 
 

@@ -1,8 +1,8 @@
 """
-Upload exercise questions JSON to Supabase database.
+Upload solved examples JSON to Supabase database.
 
 Usage:
-    uv run python upload_exercise.py
+    uv run python upload_solved_examples.py
 """
 
 import asyncio
@@ -12,18 +12,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from config import setup_logging, get_subject_id
-from schemas import load_exercise_bank_json
+from schemas import load_solved_bank_json
 from pipelines.upload_pipeline import (
     create_supabase_client,
-    upload_exercise_questions_to_supabase,
+    upload_solved_examples_to_supabase,
 )
-from utils.paths import get_exercise_questions_json_path
+from utils.paths import get_solved_examples_json_path
 
 setup_logging()
 
 
 async def upload_to_db(pdf_path: str | Path, subject_name: str = "maths_6_corodova"):
-    """Upload exercise questions from JSON to Supabase."""
+    """Upload solved examples from JSON to Supabase."""
     pdf_path = Path(pdf_path)
     
     # Get subject ID from config
@@ -32,7 +32,7 @@ async def upload_to_db(pdf_path: str | Path, subject_name: str = "maths_6_corodo
         raise ValueError(f"Subject ID not found for: {subject_name}")
     
     # Get JSON path
-    json_path = get_exercise_questions_json_path(pdf_path)
+    json_path = get_solved_examples_json_path(pdf_path)
     
     if not json_path.exists():
         raise FileNotFoundError(f"JSON file not found: {json_path}")
@@ -42,16 +42,16 @@ async def upload_to_db(pdf_path: str | Path, subject_name: str = "maths_6_corodo
     
     # Load the JSON
     print("  ⏳ Loading JSON...")
-    exercise_bank = load_exercise_bank_json(str(json_path))
-    print(f"  ✅ Loaded {len(exercise_bank.exercise_questions)} questions")
+    solved_bank = load_solved_bank_json(str(json_path))
+    print(f"  ✅ Loaded {len(solved_bank.solved_examples_questions)} solved examples")
     
     # Create Supabase client and upload
     print("  ⏳ Uploading to Supabase...")
     client = create_supabase_client()
     
-    stats = await upload_exercise_questions_to_supabase(
+    stats = await upload_solved_examples_to_supabase(
         client=client,
-        exercise_bank=exercise_bank,
+        solved_bank=solved_bank,
         subject_id=subject_id,
     )
     
@@ -84,7 +84,7 @@ async def main():
         Path("data/rbse/maths_6_corodova/14_data_handling.pdf"),
     ]
     
-    print(f"🚀 Starting upload of {len(pdf_paths)} chapters...")
+    print(f"🚀 Starting upload of {len(pdf_paths)} chapters (solved examples)...")
     print("=" * 50)
     
     total_questions = 0
@@ -104,7 +104,7 @@ async def main():
     print("\n" + "=" * 50)
     print("📊 SUMMARY")
     print("=" * 50)
-    print(f"Total questions upserted: {total_questions}")
+    print(f"Total solved examples upserted: {total_questions}")
     print(f"Total concept maps upserted: {total_maps}")
     if failed_chapters:
         print(f"Failed chapters ({len(failed_chapters)}): {failed_chapters}")
