@@ -73,6 +73,15 @@ data/
 
 ## Pipeline Workflow
 
+### Step 0: Downloading Data & Placing Appropriately
+
+- Download the pdf from the source
+- Place the pdf in the `data/<board>/<subject_name_class_number>` directory
+- The name of the pdf should be in the format `01_chapter_name.pdf`, `02_chapter_name.pdf`, etc.
+- Index pdf files in `data/<board>/<subject_name_class_number>/index.pdf`, if exists
+- Don't place other pdf starting with `01_` or `02_` etc. which are not chapters
+- Example is shown above in Data Directory Structure
+
 ### Step 1: Generate Concepts
 
 Extracts chapter → topic → concept hierarchy from PDFs:
