@@ -1,7 +1,15 @@
+"""
+PDF generator for solved examples banks.
+
+Converts SolvedExamplesBank objects to formatted PDF files using
+Playwright for HTML-to-PDF rendering with KaTeX math support.
+"""
+
 import os
 import logging
 import asyncio
 from typing import Optional
+
 
 from playwright.async_api import async_playwright
 

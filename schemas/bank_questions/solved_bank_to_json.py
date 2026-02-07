@@ -1,6 +1,13 @@
+"""
+JSON serialization for solved examples banks.
+
+Handles saving and loading SolvedExamplesBank objects to/from JSON format.
+"""
+
 import os
 import json
 import logging
+
 
 from schemas.bank_questions.question_bank_schema import SolvedExamplesBank
 

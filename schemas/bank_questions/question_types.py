@@ -1,8 +1,23 @@
+"""
+Question type schemas for structured AI output.
+
+Defines Pydantic models for different question formats (MCQ, MSQ, Fill-in-blank, etc.)
+used by the Gemini AI for structured content extraction from PDFs.
+"""
+
 from typing import Optional, List
 
 from pydantic import BaseModel, Field
+
+
 class SVG(BaseModel):
+    """
+    SVG graphic associated with a question.
+    
+    Used to store figure/diagram data when questions reference visual content.
+    """
     svg: str = Field(description="SVG relavant to the question if needed")
+
 
 
 class MSQ4(BaseModel):

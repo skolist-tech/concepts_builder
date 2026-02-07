@@ -1,7 +1,15 @@
+"""
+PDF generator for exercise questions banks.
+
+Converts ExerciseQuestionsBank objects to formatted PDF files using
+Playwright for HTML-to-PDF rendering with KaTeX math support.
+"""
+
 import os
 import logging
 import asyncio
 from typing import Optional
+
 
 from playwright.async_api import async_playwright
 

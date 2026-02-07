@@ -7,7 +7,22 @@ from schemas.concept_schema import Chapter, Topic, Concept
 
 logger = logging.getLogger(__name__)
 
+
 def create_csv(chapter: Chapter, position: int):
+    """
+    Convert a Chapter object to CSV headers and rows.
+    
+    Flattens the chapter → topic → concept hierarchy into rows,
+    with one row per concept containing all parent information.
+    
+    Args:
+        chapter: The Chapter object to convert.
+        position: Position of the chapter in the book (1-indexed).
+    
+    Returns:
+        Tuple of (headers, rows) where headers is a list of column names
+        and rows is a list of row data lists.
+    """
     headers = [
         "concept_name",
         "concept_description",
@@ -41,6 +56,16 @@ def create_csv(chapter: Chapter, position: int):
 
 
 def save_csv(chapter: Chapter, path: str, position: int):
+    """
+    Save a Chapter object to a CSV file.
+    
+    Creates parent directories if they don't exist.
+    
+    Args:
+        chapter: The Chapter object to save.
+        path: File path where the CSV will be saved.
+        position: Position of the chapter in the book (1-indexed).
+    """
     folder = os.path.dirname(path)
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -53,7 +78,24 @@ def save_csv(chapter: Chapter, path: str, position: int):
         writer.writerows(rows)
     logger.info(f"CSV saved successfully at: {path}")
 
+
 def csv_to_chapter(csv_path: str) -> Chapter:
+    """
+    Load a Chapter object from a CSV file.
+    
+    Parses the flattened CSV format back into the hierarchical
+    Chapter → Topic → Concept structure.
+    
+    Args:
+        csv_path: Path to the CSV file to load.
+    
+    Returns:
+        A Chapter object reconstructed from the CSV data.
+    
+    Raises:
+        FileNotFoundError: If the CSV file does not exist.
+    """
+
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"CSV file not found: {csv_path}")
     

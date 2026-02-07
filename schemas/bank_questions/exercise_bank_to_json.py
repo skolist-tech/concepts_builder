@@ -1,7 +1,13 @@
+"""
+JSON serialization for exercise questions banks.
+
+Handles saving and loading ExerciseQuestionsBank objects to/from JSON format.
+"""
 
 import os
 import json
 import logging
+
 
 from schemas.bank_questions.question_bank_schema import ExerciseQuestionsBank
 
