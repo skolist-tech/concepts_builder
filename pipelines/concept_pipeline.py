@@ -10,7 +10,6 @@ from typing import Optional
 
 from agents import generate_concepts
 from schemas import Chapter, save_csv
-from utils.paths import get_concepts_csv_path
 
 logger = logging.getLogger(__name__)
 
@@ -18,16 +17,18 @@ logger = logging.getLogger(__name__)
 async def process_chapter_for_concepts(
     chapter_pdf_path: Path,
     prompt: str,
-    output_csv_path: Optional[Path] = None,
+    subject_id: str,
+    output_csv_path: Path,
     chapter_position: int = 1
 ) -> Chapter:
     """
-    Process a chapter PDF to extract concepts and save to CSV.
+    Process a chapter PDF to extract concepts and save to CSV with UUIDs.
     
     Args:
         chapter_pdf_path: Path to the chapter PDF file.
         prompt: The prompt for concept extraction.
-        output_csv_path: Path for the output CSV. Auto-generated if not provided.
+        subject_id: Subject UUID for generating chapter/topic/concept UUIDs.
+        output_csv_path: Path for the output CSV file.
         chapter_position: Position of the chapter (used in CSV).
     
     Returns:
@@ -38,12 +39,10 @@ async def process_chapter_for_concepts(
         ValueError: If concept generation fails.
     """
     chapter_pdf_path = Path(chapter_pdf_path)
+    output_csv_path = Path(output_csv_path)
     
     if not chapter_pdf_path.exists():
         raise FileNotFoundError(f"PDF file not found: {chapter_pdf_path}")
-    
-    if output_csv_path is None:
-        output_csv_path = get_concepts_csv_path(chapter_pdf_path)
     
     logger.info(f"Processing chapter for concepts: {chapter_pdf_path}")
     
@@ -53,8 +52,8 @@ async def process_chapter_for_concepts(
         pdf_path=str(chapter_pdf_path)
     )
     
-    # Save to CSV
-    save_csv(chapter, str(output_csv_path), chapter_position)
+    # Save to CSV with UUIDs
+    save_csv(chapter, str(output_csv_path), chapter_position, subject_id)
     logger.info(f"Concepts saved to CSV: {output_csv_path}")
     
     return chapter

@@ -97,22 +97,28 @@ def setup_logging(
     file_handler.setFormatter(formatter)
     root_logger.addHandler(file_handler)
     
-    # Console handler
+    # Console handler with colors
+    class ColoredFormatter(logging.Formatter):
+        """Formatter that adds colors to log levels."""
+        COLORS = {
+            logging.DEBUG: "\033[36m",     # Cyan
+            logging.INFO: "\033[32m",      # Green
+            logging.WARNING: "\033[33m",   # Yellow
+            logging.ERROR: "\033[31m",     # Red
+            logging.CRITICAL: "\033[1;31m", # Bold Red
+        }
+        RESET = "\033[0m"
+        
+        def format(self, record):
+            color = self.COLORS.get(record.levelno, self.RESET)
+            message = super().format(record)
+            return f"{color}{message}{self.RESET}"
+    
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(ColoredFormatter(format_string))
     root_logger.addHandler(console_handler)
-
-
-# Subject IDs mapping (can be extended or moved to database)
-SUBJECT_IDS = {
-    "maths_6_corodova": "11ea3956-d46e-4476-bb2c-a50afa027f5c", # stage-db
-    # 'maths_6_corodova': "cc20f630-f811-49a2-ba21-632562b16ad0", 
-}
-
-
-def get_subject_id(subject_name: str) -> str:
-    """Get the UUID for a subject by name."""
-    if subject_name not in SUBJECT_IDS:
-        raise ValueError(f"Unknown subject: {subject_name}. Available: {list(SUBJECT_IDS.keys())}")
-    return SUBJECT_IDS[subject_name]
+    
+    # Suppress noisy loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)

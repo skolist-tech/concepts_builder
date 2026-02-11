@@ -8,7 +8,12 @@ Contains Pydantic models for:
 """
 
 from schemas.concept_schema import Concept, Topic, Chapter
-from schemas.chapter_to_csv import save_csv, csv_to_chapter
+from schemas.chapter_to_csv import (
+    save_csv,
+    csv_to_chapter,
+    load_csv_with_uuids,
+    get_concept_names_from_csv,
+)
 
 from schemas.bank_questions.question_bank_schema import (
     BaseQuestion,
@@ -31,6 +36,8 @@ __all__ = [
     # Chapter converters
     "save_csv",
     "csv_to_chapter",
+    "load_csv_with_uuids",
+    "get_concept_names_from_csv",
     # Question models
     "BaseQuestion",
     "MatchColumn",

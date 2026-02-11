@@ -78,27 +78,6 @@ def get_concepts_csv_path(
     return Path(output_dir) / f"{chapter_name}_concepts.csv"
 
 
-def get_concepts_sql_path(
-    chapter_pdf_path: Path,
-    output_dir: Optional[Path] = None
-) -> Path:
-    """
-    Get the output path for concepts SQL file.
-    
-    Args:
-        chapter_pdf_path: Path to the chapter PDF.
-        output_dir: Output directory. Defaults to RBSE output directory.
-    
-    Returns:
-        Path for the concepts SQL file.
-    """
-    if output_dir is None:
-        output_dir = settings.get_subject_output_dir("maths_6_corodova")
-    
-    chapter_name = get_chapter_name(chapter_pdf_path)
-    return Path(output_dir) / f"{chapter_name}_concepts.sql"
-
-
 def get_solved_examples_json_path(
     chapter_pdf_path: Path,
     output_dir: Optional[Path] = None

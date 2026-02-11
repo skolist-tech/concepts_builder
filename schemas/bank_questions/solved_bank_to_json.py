@@ -1,46 +1,54 @@
 """
-JSON serialization for solved examples banks.
+JSON serialization for solved examples banks with UUID generation.
 
-Handles saving and loading SolvedExamplesBank objects to/from JSON format.
+Handles saving and loading SolvedExamplesBank objects to/from JSON format,
+generating deterministic UUIDs during serialization.
 """
 
 import os
 import json
 import logging
-
+from typing import Dict, Any, List
 
 from schemas.bank_questions.question_bank_schema import SolvedExamplesBank
+from utils.uuid_generator import generate_question_id, generate_chapter_id
 
 logger = logging.getLogger(__name__)
 
-def solved_bank_to_json(solved_bank: SolvedExamplesBank ) -> str:
-    """
-    Convert a SolvedExamplesBank object to a JSON string.
 
-    Args:
-        solved_bank (SolvedExamplesBank): The solved examples bank object.
-
-    Returns:
-        str: JSON string representation of the solved examples bank.
+def save_solved_bank_json(solved_bank: SolvedExamplesBank, path: str, subject_id: str):
     """
-    return solved_bank.model_dump_json(indent=4)
-
-def save_solved_bank_json(solved_bank: SolvedExamplesBank, path: str):
-    """
-    Save the SolvedExamplesBank object as a JSON file.
+    Save the SolvedExamplesBank object as a JSON file with generated UUIDs.
 
     Args:
         solved_bank (SolvedExamplesBank): The solved examples bank object.
         path (str): The file path to save the JSON data.
+        subject_id (str): Subject UUID for generating question UUIDs.
     """
-    json_data = solved_bank_to_json(solved_bank)
+    # Convert to dict and add UUIDs
+    data = solved_bank.model_dump()
+    
+    # Generate chapter_id
+    chapter_id = generate_chapter_id(subject_id, solved_bank.chapter_name)
+    data["chapter_id"] = chapter_id
+    data["subject_id"] = subject_id
+    
+    # Generate UUIDs for each question
+    for question in data["solved_examples_questions"]:
+        question_id = generate_question_id(subject_id, question)
+        question["id"] = question_id
+    
+    # Create directory if needed
     base_dir = os.path.dirname(path)
-    if not os.path.exists(base_dir):
+    if base_dir and not os.path.exists(base_dir):
         os.makedirs(base_dir)
         logger.info(f"Created directory: {base_dir}")
     
+    # Save to file
     with open(path, "w", encoding="utf-8") as f:
-        f.write(json_data)
+        json.dump(data, f, indent=4, ensure_ascii=False)
+    
+    logger.info(f"Solved examples bank saved with {len(data['solved_examples_questions'])} questions to {path}")
 
 
 def _sanitize_question(question: dict) -> dict:
@@ -65,19 +73,19 @@ def _sanitize_question(question: dict) -> dict:
     return question
 
 
-def load_solved_bank_json(path: str) -> SolvedExamplesBank:
+def load_solved_bank_json(path: str) -> Dict[str, Any]:
     """
-    Load a SolvedExamplesBank object from a JSON file.
+    Load solved examples data from a JSON file including UUIDs.
 
     Args:
         path (str): The file path to load the JSON data from.
 
     Returns:
-        SolvedExamplesBank: The parsed SolvedExamplesBank object.
+        Dictionary with chapter_id, subject_id, chapter_name and solved_examples_questions list.
+        Each question includes its 'id' field.
     
     Raises:
         FileNotFoundError: If the JSON file does not exist.
-        ValueError: If the JSON is invalid or doesn't match the schema.
     """
     if not os.path.exists(path):
         raise FileNotFoundError(f"JSON file not found at {path}")
@@ -91,6 +99,5 @@ def load_solved_bank_json(path: str) -> SolvedExamplesBank:
             _sanitize_question(q) for q in data["solved_examples_questions"]
         ]
     
-    solved_bank = SolvedExamplesBank.model_validate(data)
-    logger.info(f"Loaded SolvedExamplesBank from {path} with {len(solved_bank.solved_examples_questions)} questions")
-    return solved_bank
+    logger.info(f"Loaded SolvedExamplesBank from {path} with {len(data.get('solved_examples_questions', []))} questions")
+    return data
