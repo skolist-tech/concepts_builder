@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run tests
+        env:
+        #   Since, tests do not require real API Keys, we can set dummy values for the environment variables.
+        #   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        #   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        #   SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+            GEMINI_API_KEY: dummy_gemini_api_key
+            SUPABASE_URL: dummy_supabase_url
+            SUPABASE_SERVICE_KEY: dummy_supabase_service_key
+        run: uv run pytest -v
