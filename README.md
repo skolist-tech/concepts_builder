@@ -27,6 +27,9 @@ This tool provides CLI commands for the content extraction pipeline:
 ### Migration Commands
 - **`migrate_add_uuids.py`** - Add UUIDs to existing CSV/JSON files without them
 
+### Verification Commands
+- **`verify_concept_exercise_solved_example.py`** - Verify consistency between CSVs and JSONs
+
 ## Prerequisites
 
 - **Python 3.11+**
@@ -247,6 +250,74 @@ python migrate_add_uuids.py \
 
 Processes all `*_concepts.csv`, `*_exercise_questions.json`, and `*_solved_examples.json` files in the directory, adding deterministic UUIDs.
 
+### Verify Files (Check Consistency)
+
+Verify that concept CSVs and question JSONs are consistent:
+
+```bash
+# Check chapter_name and chapter_id match between CSVs and JSONs
+python verify_concept_exercise_solved_example.py \
+    --input_dir ./output/maths_6 \
+    --check-chapters
+
+# Check that concepts referenced in questions exist in concept CSVs
+python verify_concept_exercise_solved_example.py \
+    --input_dir ./output/maths_6 \
+    --check-concepts
+
+# Check file naming conventions and position consistency
+python verify_concept_exercise_solved_example.py \
+    --input_dir ./output/maths_6 \
+    --check-conventions
+
+# Run all checks
+python verify_concept_exercise_solved_example.py \
+    --input_dir ./output/maths_6 \
+    --check-chapters --check-concepts --check-conventions
+```
+
+**Output:**
+```
+======================================================================
+CHAPTER CONSISTENCY CHECK
+======================================================================
+   1. 01_knowing_our_numbers                       [PASS]
+   2. 02_whole_numbers                             [PASS]
+  11. 11_linear_equations                          [FAIL]
+      -> Exercise JSON chapter_id mismatch: CSV='0b1c52b4...' vs JSON='88a56fde...'
+======================================================================
+Chapter check: 10 passed, 1 failed
+
+======================================================================
+CONCEPT MAPPING CHECK
+======================================================================
+   1. 01_knowing_our_numbers                       [PASS]
+  16. 16_data_handling                             [FAIL] - 2 missing concepts
+      -> [Exercise] Interpreting Pie Charts
+      -> [Solved] Advanced Bar Graphs
+======================================================================
+Concept check: 15 passed, 1 failed
+
+======================================================================
+FILE CONVENTIONS CHECK
+======================================================================
+   1. 01_knowing_our_numbers                       [PASS]
+   2. 02_whole_numbers                             [FAIL]
+      -> Filename number (02) != chapter_position (3)
+      -> Missing exercise JSON: 02_whole_numbers_exercise_questions.json
+======================================================================
+Conventions check: 1 passed, 1 failed
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--input_dir` | Yes | Directory containing concept CSVs and question JSONs |
+| `--check-chapters` | No | Check chapter_name and chapter_id consistency (also checks internal CSV row consistency) |
+| `--check-concepts` | No | Check that concepts in questions exist in CSVs |
+| `--check-conventions` | No | Check file naming conventions: number prefix matches chapter_position, all 3 files exist per chapter |
+
+**Note:** At least one of `--check-chapters`, `--check-concepts`, or `--check-conventions` must be specified.
+
 ## Prompt Files
 
 Each builder command requires a `--prompt_file_path` argument pointing to a text file containing the extraction prompt. Example prompts are in the `prompts/` directory.
@@ -322,6 +393,7 @@ concepts_builder/
 ├── generate_school_class_id.py  # CLI: board_id + school_class_name → school_class_id
 ├── generate_subject_id.py       # CLI: school_class_id + subject_name → subject_id
 ├── migrate_add_uuids.py         # CLI: Add UUIDs to legacy files
+├── verify_concept_exercise_solved_example.py  # CLI: Verify CSV/JSON consistency
 ├── config.py                    # Settings and logging
 ├── agents/                      # AI-powered generators (Gemini)
 │   ├── base.py                  # Shared Gemini client utilities
