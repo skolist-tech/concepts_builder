@@ -166,7 +166,7 @@ def question_to_db_record(
         "is_true": question.get("istrue"),
         "answer_text": question.get("answer_text", ""),
         "explanation": question.get("explanation", ""),
-        "hardness_level": question.get("hardness_level"),
+        "hardness_level": question.get("hardness_level", "").lower() if question.get("hardness_level") else None,
         "question_type": normalize_question_type(question.get("question_type")),
         "is_image_needed": 1 if question.get("is_image_needed") else 0,
         "is_solved_example": 0,
