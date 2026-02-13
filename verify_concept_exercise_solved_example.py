@@ -237,6 +237,42 @@ def check_chapter_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, 
     return passed, failed, failures
 
 
+def is_subsequence(shorter: str, longer: str) -> bool:
+    """
+    Check if 'shorter' is a subsequence of 'longer' (case-insensitive).
+    
+    A subsequence means characters appear in order but don't need to be contiguous.
+    e.g., "ace" is a subsequence of "abcde"
+    """
+    shorter = shorter.lower()
+    longer = longer.lower()
+    
+    it = iter(longer)
+    return all(char in it for char in shorter)
+
+
+def find_similar_concepts(missing_concept: str, available_concepts: Set[str], max_suggestions: int = 3) -> List[str]:
+    """
+    Find available concepts where one is a subsequence of the other (case-insensitive).
+    
+    Args:
+        missing_concept: The concept that was not found
+        available_concepts: Set of available concept names from CSV
+        max_suggestions: Maximum number of suggestions to return
+    
+    Returns:
+        List of similar concept names
+    """
+    suggestions = []
+    
+    for available in available_concepts:
+        # Check if missing concept is subsequence of available, or vice versa
+        if is_subsequence(missing_concept, available) or is_subsequence(available, missing_concept):
+            suggestions.append(available)
+    
+    return sorted(suggestions)[:max_suggestions]
+
+
 def check_concept_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, List[Dict]]:
     """
     Check that concepts referenced in questions exist in concept CSVs.
@@ -261,33 +297,162 @@ def check_concept_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, 
         csv_info = load_csv_chapter_info(csv_path)
         available_concepts = csv_info["concepts"]
         
-        group_missing = set()
+        # Create multiple lookups for different mismatch types
+        # Stripped lookup: {stripped: original}
+        available_concepts_stripped = {c.strip(): c for c in available_concepts}
+        # Case-insensitive lookup: {lowercase_stripped: original}
+        available_concepts_lower = {c.strip().lower(): c for c in available_concepts}
+        
+        # Track issues: {concept_name: {"source": str, "type": str, "correct_form": Optional[str]}}
+        # type can be "whitespace_mismatch", "case_mismatch", "invisible_chars", or "missing"
+        concept_issues: Dict[str, Dict] = {}
+        
+        def normalize_concept(s: str) -> str:
+            """Normalize a concept name by stripping and replacing various whitespace chars."""
+            import unicodedata
+            # Normalize unicode (NFKC converts various unicode chars to their canonical form)
+            s = unicodedata.normalize('NFKC', s)
+            # Replace various whitespace characters with regular space
+            s = ''.join(' ' if c.isspace() else c for c in s)
+            # Strip and collapse multiple spaces
+            return ' '.join(s.split())
+        
+        # Create normalized lookup: {normalized: original}
+        available_concepts_normalized = {normalize_concept(c): c for c in available_concepts}
+        
+        def check_concept(concept: str, source: str):
+            """Check a concept and track the issue type."""
+            if concept in available_concepts:
+                return  # Exact match, no issue
+            
+            concept_stripped = concept.strip()
+            concept_lower = concept_stripped.lower()
+            concept_normalized = normalize_concept(concept)
+            concept_normalized_lower = concept_normalized.lower()
+            
+            # Check for whitespace mismatch (stripping makes it match)
+            if concept_stripped in available_concepts_stripped:
+                correct_form = available_concepts_stripped[concept_stripped]
+                if concept in concept_issues:
+                    concept_issues[concept]["source"] = "[Both]"
+                else:
+                    concept_issues[concept] = {
+                        "source": source,
+                        "type": "whitespace_mismatch",
+                        "correct_form": correct_form
+                    }
+            # Check for case mismatch
+            elif concept_lower in available_concepts_lower:
+                correct_form = available_concepts_lower[concept_lower]
+                if concept in concept_issues:
+                    concept_issues[concept]["source"] = "[Both]"
+                else:
+                    concept_issues[concept] = {
+                        "source": source,
+                        "type": "case_mismatch",
+                        "correct_form": correct_form
+                    }
+            # Check for invisible/unicode character issues (normalized match)
+            elif concept_normalized in available_concepts_normalized:
+                correct_form = available_concepts_normalized[concept_normalized]
+                if concept in concept_issues:
+                    concept_issues[concept]["source"] = "[Both]"
+                else:
+                    concept_issues[concept] = {
+                        "source": source,
+                        "type": "invisible_chars",
+                        "correct_form": correct_form
+                    }
+            # Check for normalized + case insensitive match
+            elif concept_normalized_lower in {normalize_concept(c).lower(): c for c in available_concepts}:
+                correct_form = {normalize_concept(c).lower(): c for c in available_concepts}[concept_normalized_lower]
+                if concept in concept_issues:
+                    concept_issues[concept]["source"] = "[Both]"
+                else:
+                    concept_issues[concept] = {
+                        "source": source,
+                        "type": "invisible_chars",
+                        "correct_form": correct_form
+                    }
+            else:
+                # Truly missing concept
+                if concept in concept_issues:
+                    concept_issues[concept]["source"] = "[Both]"
+                else:
+                    concept_issues[concept] = {
+                        "source": source,
+                        "type": "missing",
+                        "correct_form": None
+                    }
         
         # Check exercise JSON concepts
         if exercise_path:
             exercise_info = load_json_info(exercise_path, "exercise_questions")
             for concept in exercise_info["concepts_referenced"]:
-                if concept not in available_concepts:
-                    group_missing.add(f"[Exercise] {concept}")
+                check_concept(concept, "[Exercise]")
         
         # Check solved examples JSON concepts
         if solved_path:
             solved_info = load_json_info(solved_path, "solved_examples_questions")
             for concept in solved_info["concepts_referenced"]:
-                if concept not in available_concepts:
-                    group_missing.add(f"[Solved] {concept}")
+                check_concept(concept, "[Solved]")
         
-        if not group_missing:
+        if not concept_issues:
             passed += 1
             logger.info(f"  {idx:2}. {prefix:<45} [PASS]")
         else:
             failed += 1
-            logger.error(f"  {idx:2}. {prefix:<45} [FAIL] - {len(group_missing)} missing concepts")
-            for missing in sorted(group_missing):
-                logger.error(f"      -> {missing}")
+            
+            # Count issues by type
+            whitespace_mismatches = sum(1 for v in concept_issues.values() if v["type"] == "whitespace_mismatch")
+            case_mismatches = sum(1 for v in concept_issues.values() if v["type"] == "case_mismatch")
+            invisible_chars = sum(1 for v in concept_issues.values() if v["type"] == "invisible_chars")
+            truly_missing = sum(1 for v in concept_issues.values() if v["type"] == "missing")
+            
+            issue_summary = []
+            if whitespace_mismatches > 0:
+                issue_summary.append(f"{whitespace_mismatches} whitespace issue(s)")
+            if case_mismatches > 0:
+                issue_summary.append(f"{case_mismatches} case mismatch(es)")
+            if invisible_chars > 0:
+                issue_summary.append(f"{invisible_chars} unicode/invisible char(s)")
+            if truly_missing > 0:
+                issue_summary.append(f"{truly_missing} missing")
+            
+            logger.error(f"  {idx:2}. {prefix:<45} [FAIL] - {', '.join(issue_summary)}")
+            
+            for concept_name in sorted(concept_issues.keys()):
+                issue = concept_issues[concept_name]
+                source = issue["source"]
+                
+                if issue["type"] == "whitespace_mismatch":
+                    correct_form = issue["correct_form"]
+                    logger.error(f"      -> {source} WHITESPACE: '{concept_name}' (has extra spaces) should be '{correct_form}'")
+                elif issue["type"] == "case_mismatch":
+                    correct_form = issue["correct_form"]
+                    logger.error(f"      -> {source} CASE MISMATCH: '{concept_name}' should be '{correct_form}'")
+                elif issue["type"] == "invisible_chars":
+                    correct_form = issue["correct_form"]
+                    logger.error(f"      -> {source} UNICODE/INVISIBLE CHARS: '{concept_name}' should be '{correct_form}'")
+                    logger.error(f"         DEBUG: JSON repr={repr(concept_name)}, CSV repr={repr(correct_form)}")
+                else:
+                    logger.error(f"      -> {source} MISSING: '{concept_name}'")
+                    # Find and show suggestions only for truly missing concepts
+                    suggestions = find_similar_concepts(concept_name, available_concepts)
+                    if suggestions:
+                        logger.info(f"         Suggestions: {', '.join(suggestions)}")
+                        # Debug: if any suggestion looks visually identical, show repr
+                        for sug in suggestions:
+                            if sug == concept_name or sug.strip() == concept_name.strip():
+                                logger.error(f"         DEBUG: Visually similar! JSON repr={repr(concept_name)}, CSV repr={repr(sug)}")
+            
             failures.append({
                 "prefix": prefix,
-                "missing_concepts": sorted(group_missing),
+                "issues": sorted(
+                    f"{v['source']} {v['type'].upper().replace('_', ' ')}: {k}" 
+                    + (f" -> {v['correct_form']}" if v['correct_form'] else "")
+                    for k, v in concept_issues.items()
+                ),
             })
     
     logger.info("=" * 70)

@@ -213,7 +213,22 @@ python exercise_questions_builder.py \
 
 **Output:** `{chapter_name}_exercise_questions.json`
 
-### Step 4: Upload Concepts
+### Step 4: Verify Files (REQUIRED before upload)
+
+**Always verify files before uploading to Supabase** to catch mismatches early:
+
+```bash
+python verify_concept_exercise_solved_example.py \
+    --input_dir ./output/maths_6 \
+    --check-chapters --check-concepts --check-conventions
+```
+
+Fix any failures before proceeding:
+- **Chapter mismatches**: Re-run `migrate_add_uuids.py` to regenerate UUIDs
+- **Concept mismatches**: Add missing concepts to CSV or rename concepts in JSON
+- **Convention failures**: Rename files to match pattern `{number}_{name}_{type}.{ext}`
+
+### Step 5: Upload Concepts
 
 Upload concept CSVs to Supabase:
 
@@ -221,7 +236,7 @@ Upload concept CSVs to Supabase:
 python concepts_uploader.py --input_dir ./output/maths_6
 ```
 
-### Step 5: Upload Solved Examples
+### Step 6: Upload Solved Examples
 
 Upload solved examples JSONs to Supabase:
 
@@ -229,7 +244,7 @@ Upload solved examples JSONs to Supabase:
 python solved_examples_uploader.py --input_dir ./output/maths_6
 ```
 
-### Step 6: Upload Exercise Questions
+### Step 7: Upload Exercise Questions
 
 Upload exercise question JSONs to Supabase:
 
@@ -294,7 +309,9 @@ CONCEPT MAPPING CHECK
    1. 01_knowing_our_numbers                       [PASS]
   16. 16_data_handling                             [FAIL] - 2 missing concepts
       -> [Exercise] Interpreting Pie Charts
-      -> [Solved] Advanced Bar Graphs
+         Suggestions: Interpreting Pie Chart Data, Pie Chart Interpretation
+      -> [Solved] Comparing Decimals
+         Suggestions: Comparing Unlike Decimals, Decimal Comparison
 ======================================================================
 Concept check: 15 passed, 1 failed
 
@@ -309,14 +326,20 @@ FILE CONVENTIONS CHECK
 Conventions check: 1 passed, 1 failed
 ```
 
+When concepts are missing, the tool uses **subsequence matching** to suggest similar concepts from the CSV. This helps identify typos or slight naming differences.
+
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `--input_dir` | Yes | Directory containing concept CSVs and question JSONs |
 | `--check-chapters` | No | Check chapter_name and chapter_id consistency (also checks internal CSV row consistency) |
-| `--check-concepts` | No | Check that concepts in questions exist in CSVs |
+| `--check-concepts` | No | Check that concepts in questions exist in CSVs (with suggestions for mismatches) |
 | `--check-conventions` | No | Check file naming conventions: number prefix matches chapter_position, all 3 files exist per chapter |
 
 **Note:** At least one of `--check-chapters`, `--check-concepts`, or `--check-conventions` must be specified.
+
+> **IMPORTANT:** Before uploading to Supabase, run `--check-concepts` and fix ALL concept mismatches. Missing concepts will not be linked in `bank_questions_concepts_maps`, breaking the question-to-concept relationship. Either:
+> 1. Add the missing concept to the CSV, or
+> 2. Update the concept name in the JSON to match an existing concept (use suggestions as hints)
 
 ## Prompt Files
 
