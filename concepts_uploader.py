@@ -176,9 +176,8 @@ async def upload_all_concepts(input_dir: Path) -> None:
     successful = 0
     failed = 0
     
-    # Track per-chapter results for summary
+    # Track per-chapter results for summary (both successful and failed)
     chapter_results: List[Dict[str, Any]] = []
-    failed_chapters: List[str] = []
     
     for i, csv_path in enumerate(csv_files, 1):
         logger.info(f"[{i}/{len(csv_files)}] Uploading: {csv_path.name}")
@@ -193,27 +192,30 @@ async def upload_all_concepts(input_dir: Path) -> None:
                 "name": stats["chapter_name"],
                 "topics": stats["topics"],
                 "concepts": stats["concepts"],
+                "failed": False,
             })
         except Exception as e:
             logger.error(f"[{i}/{len(csv_files)}] Failed: {csv_path.name} - {e}")
             failed += 1
-            failed_chapters.append(csv_path.name)
+            # Extract chapter name from filename (remove suffix and leading numbers)
+            chapter_name = csv_path.stem.replace("_concepts", "").lstrip("0123456789_")
+            chapter_results.append({
+                "name": chapter_name,
+                "topics": 0,
+                "concepts": 0,
+                "failed": True,
+            })
     
     # Log per-chapter summary
     logger.info("=" * 60)
     logger.info("UPLOAD SUMMARY")
     logger.info("=" * 60)
     for idx, result in enumerate(chapter_results, 1):
-        logger.info(
-            f"  {idx:2}. {result['name']:<40} | Topics: {result['topics']:3} | Concepts: {result['concepts']:3}"
-        )
-    
-    # Log failed chapters if any
-    if failed_chapters:
-        logger.info("-" * 60)
-        logger.error("FAILED CHAPTERS:")
-        for chapter_file in failed_chapters:
-            logger.error(f"  - {chapter_file}")
+        line = f"  {idx:2}. {result['name']:<40} | Topics: {result['topics']:3} | Concepts: {result['concepts']:3}"
+        if result["failed"]:
+            logger.error(f"{line}  [FAILED]")
+        else:
+            logger.info(line)
     
     logger.info("=" * 60)
     if failed > 0:

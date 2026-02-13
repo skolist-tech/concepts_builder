@@ -212,6 +212,7 @@ async def upload_exercise_questions_from_json(
     # Build question records and concept maps
     questions_by_id = {}
     concept_maps_by_id = {}
+    failed_maps_count = 0
     
     for question in questions:
         record = question_to_db_record(question, subject_id, chapter_id)
@@ -237,6 +238,7 @@ async def upload_exercise_questions_from_json(
                     }
             else:
                 logger.warning(f"Concept '{concept_name}' not found for subject {subject_id}")
+                failed_maps_count += 1
     
     batch_questions = list(questions_by_id.values())
     batch_concept_maps = list(concept_maps_by_id.values())
@@ -273,6 +275,7 @@ async def upload_exercise_questions_from_json(
         "chapter_name": chapter_name,
         "questions": questions_upserted,
         "concept_maps": maps_upserted,
+        "failed_maps": failed_maps_count,
     }
 
 
@@ -285,12 +288,12 @@ async def upload_all_exercise_questions(input_dir: Path) -> None:
     
     total_questions = 0
     total_maps = 0
+    total_failed_maps = 0
     successful = 0
     failed = 0
     
-    # Track per-chapter results for summary
+    # Track per-chapter results for summary (both successful and failed)
     chapter_results: List[Dict[str, Any]] = []
-    failed_chapters: List[str] = []
     
     for i, json_path in enumerate(json_files, 1):
         logger.info(f"[{i}/{len(json_files)}] Uploading: {json_path.name}")
@@ -299,32 +302,41 @@ async def upload_all_exercise_questions(input_dir: Path) -> None:
             stats = await upload_exercise_questions_from_json(client, json_path)
             total_questions += stats["questions"]
             total_maps += stats["concept_maps"]
+            total_failed_maps += stats["failed_maps"]
             successful += 1
             chapter_results.append({
                 "name": stats["chapter_name"],
                 "questions": stats["questions"],
                 "concept_maps": stats["concept_maps"],
+                "failed_maps": stats["failed_maps"],
+                "failed": False,
             })
         except Exception as e:
             logger.error(f"[{i}/{len(json_files)}] Failed: {json_path.name} - {e}")
             failed += 1
-            failed_chapters.append(json_path.name)
+            # Extract chapter name from filename (remove suffix and leading numbers)
+            chapter_name = json_path.stem.replace("_exercise_questions", "").lstrip("0123456789_")
+            chapter_results.append({
+                "name": chapter_name,
+                "questions": 0,
+                "concept_maps": 0,
+                "failed_maps": 0,
+                "failed": True,
+            })
     
     # Log per-chapter summary
     logger.info("=" * 60)
     logger.info("UPLOAD SUMMARY")
     logger.info("=" * 60)
     for idx, result in enumerate(chapter_results, 1):
-        logger.info(
-            f"  {idx:2}. {result['name']:<40} | Questions: {result['questions']:3} | Maps: {result['concept_maps']:3}"
-        )
-    
-    # Log failed chapters if any
-    if failed_chapters:
-        logger.info("-" * 60)
-        logger.error("FAILED CHAPTERS:")
-        for chapter_file in failed_chapters:
-            logger.error(f"  - {chapter_file}")
+        line = f"  {idx:2}. {result['name']:<40} | Questions: {result['questions']:3} | Maps: {result['concept_maps']:3}"
+        if result["failed"]:
+            logger.error(f"{line}  [FAILED]")
+        elif result["failed_maps"] > 0:
+            logger.info(line)
+            logger.error(f"      {'':40}   Failed Maps: {result['failed_maps']:3}")
+        else:
+            logger.info(line)
     
     logger.info("=" * 60)
     if failed > 0:
@@ -332,6 +344,8 @@ async def upload_all_exercise_questions(input_dir: Path) -> None:
     else:
         logger.info(f"Upload complete: {successful} successful, {failed} failed")
     logger.info(f"Total: {total_questions} questions, {total_maps} concept maps")
+    if total_failed_maps > 0:
+        logger.error(f"Total failed concept maps: {total_failed_maps}")
 
 
 def main():

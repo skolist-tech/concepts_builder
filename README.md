@@ -10,6 +10,10 @@ This tool provides CLI commands for the content extraction pipeline:
 - **`generate_school_class_id.py`** - Generate school_class UUID from board_id + school_class_name
 - **`generate_subject_id.py`** - Generate subject UUID from school_class_id + subject_name
 
+### Database Record Commands (Create in Supabase)
+- **`add_school_class.py`** - Create school_class record in Supabase with deterministic UUID
+- **`add_subject.py`** - Create subject record in Supabase with deterministic UUID
+
 ### Generation Commands (PDF → CSV/JSON with UUIDs)
 1. **`concepts_builder.py`** - Extract concepts from PDFs → CSV with chapter/topic/concept UUIDs
 2. **`exercise_questions_builder.py`** - Extract exercise questions → JSON with question UUIDs
@@ -98,6 +102,65 @@ python generate_subject_id.py \
 ```
 
 Use the generated `subject_id` in the builder commands below.
+
+### Add School Class (to Supabase)
+
+Create a school_class record in Supabase with a deterministic UUID:
+
+```bash
+python add_school_class.py \
+    --board_id 550e8400-e29b-41d4-a716-446655440000 \
+    --school_class_name "Class 6" \
+    --position 6
+```
+
+**Output:**
+```
+==================================================
+School Class Created Successfully
+==================================================
+Board ID:    550e8400-e29b-41d4-a716-446655440000
+Board Name:  RBSE
+School Class Name:  Class 6
+School Class ID:    7cd86129-fb77-5fae-829a-3a4ec87c1669
+Position:    6
+==================================================
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--board_id` | Yes | Board UUID (must exist in Supabase) |
+| `--school_class_name` | Yes | Class name (e.g., "Class 6", "Class 10") |
+| `--position` | Yes | Position/order of the class (e.g., 6 for Class 6) |
+
+### Add Subject (to Supabase)
+
+Create a subject record in Supabase with a deterministic UUID:
+
+```bash
+python add_subject.py \
+    --school_class_id 7cd86129-fb77-5fae-829a-3a4ec87c1669 \
+    --subject_name "Mathematics"
+```
+
+**Output:**
+```
+==================================================
+Subject Created Successfully
+==================================================
+Board ID:      550e8400-e29b-41d4-a716-446655440000
+Board Name:    RBSE
+Class ID:      7cd86129-fb77-5fae-829a-3a4ec87c1669
+Class Name:    Class 6
+Subject Name:  Mathematics
+Subject ID:    2176654b-2688-5e0c-8910-2e2f8ee596d1
+==================================================
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--school_class_id` | Yes | School class UUID (must exist in Supabase) |
+| `--subject_name` | Yes | Subject name (e.g., "Mathematics", "Science") |
 
 ### Step 1: Generate Concepts
 
@@ -254,7 +317,9 @@ concepts_builder/
 ├── concepts_uploader.py         # CLI: CSV → Supabase
 ├── exercise_questions_uploader.py # CLI: JSON → Supabase
 ├── solved_examples_uploader.py  # CLI: JSON → Supabase
-├── generate_school_class_id.py         # CLI: board_id + school_class_name → school_class_id
+├── add_school_class.py          # CLI: Create school_class in Supabase
+├── add_subject.py               # CLI: Create subject in Supabase
+├── generate_school_class_id.py  # CLI: board_id + school_class_name → school_class_id
 ├── generate_subject_id.py       # CLI: school_class_id + subject_name → subject_id
 ├── migrate_add_uuids.py         # CLI: Add UUIDs to legacy files
 ├── config.py                    # Settings and logging
