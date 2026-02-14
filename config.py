@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     
     # Paths - Base directories
     base_dir: Path = Field(default_factory=lambda: Path(__file__).parent)
-    data_dir: Path = Field(default_factory=lambda: Path(__file__).parent / "data")
     
     class Config:
         env_file = ".env"
