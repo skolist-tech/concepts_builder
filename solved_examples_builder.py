@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-from config import setup_logging
+from config import setup_logging, settings
 from pipelines.questions_pipeline import process_chapter_for_solved_examples
 from utils.prompt_loader import load_prompt
 from utils.uuid_generator import validate_uuid
@@ -60,46 +60,57 @@ async def process_all_chapters(
     input_dir: Path,
     output_dir: Path,
     subject_id: str,
-    prompt: str
+    prompt: str,
+    reprocess: bool = False
 ) -> None:
     """Process all chapter PDFs in the input directory."""
     pdf_files = get_pdf_files(input_dir)
     logger.info(f"Found {len(pdf_files)} PDF files to process")
-    
+
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
-    
-    successful = 0
-    failed = 0
-    
-    for i, pdf_path in enumerate(pdf_files, 1):
+
+    max_concurrent = getattr(settings, "max_concurrent_generations", 3)
+    logger.info(f"Using max_concurrent_generations={max_concurrent}")
+
+    sem = asyncio.Semaphore(max_concurrent)
+
+    async def process_one(i, pdf_path):
         concepts_csv_path = get_concepts_csv_path(pdf_path, output_dir)
         output_json_path = get_output_json_path(pdf_path, output_dir)
-        
-        logger.info(f"[{i}/{len(pdf_files)}] Processing: {pdf_path.name}")
-        
+
         # Check if concepts CSV exists
         if not concepts_csv_path.exists():
             logger.error(f"[{i}/{len(pdf_files)}] Concepts CSV not found: {concepts_csv_path}")
             logger.error("Please run concepts_builder.py first to generate concept CSVs")
-            failed += 1
-            continue
-        
-        try:
-            await process_chapter_for_solved_examples(
-                chapter_pdf_path=pdf_path,
-                prompt=prompt,
-                subject_id=subject_id,
-                concepts_csv_path=concepts_csv_path,
-                output_json_path=output_json_path
-            )
-            successful += 1
-            logger.info(f"[{i}/{len(pdf_files)}] Saved: {output_json_path.name}")
-        except Exception as e:
-            failed += 1
-            logger.error(f"[{i}/{len(pdf_files)}] Failed: {pdf_path.name} - {e}")
-    
-    logger.info(f"Completed: {successful} successful, {failed} failed out of {len(pdf_files)}")
+            return "missing_csv"
+
+        if not reprocess and output_json_path.exists():
+            logger.info(f"[{i}/{len(pdf_files)}] Already processed earlier: {output_json_path.name}, skipping")
+            return None  # skipped
+
+        logger.info(f"[{i}/{len(pdf_files)}] Processing: {pdf_path.name}")
+        async with sem:
+            try:
+                await process_chapter_for_solved_examples(
+                    chapter_pdf_path=pdf_path,
+                    prompt=prompt,
+                    subject_id=subject_id,
+                    concepts_csv_path=concepts_csv_path,
+                    output_json_path=output_json_path
+                )
+                logger.info(f"[{i}/{len(pdf_files)}] Saved: {output_json_path.name}")
+                return True
+            except Exception as e:
+                logger.error(f"[{i}/{len(pdf_files)}] Failed: {pdf_path.name} - {e}")
+                return False
+
+    tasks = [process_one(i, pdf_path) for i, pdf_path in enumerate(pdf_files, 1)]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    successful = sum(1 for r in results if r is True)
+    skipped = sum(1 for r in results if r is None)
+    failed = sum(1 for r in results if r is False or r == "missing_csv" or isinstance(r, Exception))
+    logger.info(f"Completed: {successful} successful, {skipped} skipped, {failed} failed out of {len(pdf_files)}")
 
 
 def main():
@@ -130,6 +141,12 @@ def main():
         required=True,
         help="Path to the prompt file for solved examples extraction"
     )
+    parser.add_argument(
+        "--reprocess",
+        action="store_true",
+        default=False,
+        help="Reprocess all chapters even if output JSON already exists (override skipping of already processed chapters)"
+    )
     
     args = parser.parse_args()
     
@@ -151,13 +168,18 @@ def main():
     logger.info(f"Input directory: {input_dir}")
     logger.info(f"Output directory: {output_dir}")
     logger.info(f"Subject ID: {args.subject_id}")
-    
+    if not args.reprocess:
+        logger.info("Skipping chapters with existing output JSONs (use --reprocess to force reprocessing)")
+    else:
+        logger.warning("Reprocessing all chapters (existing output JSONs will be overwritten)")
+
     try:
         asyncio.run(process_all_chapters(
             input_dir=input_dir,
             output_dir=output_dir,
             subject_id=args.subject_id,
-            prompt=prompt
+            prompt=prompt,
+            reprocess=args.reprocess
         ))
     except (FileNotFoundError, ValueError) as e:
         logger.error(str(e))

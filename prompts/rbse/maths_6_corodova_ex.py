@@ -24,6 +24,4 @@ LATEX_INSTRUCTIONS:
 - Never output HTML tags like <br>, <p>, <span>, etc.; return only plain text with \n for line breaks.
 Ex. If \\sin^2\\theta = \\frac{{1}}{{3}}, what is the value of \\cos^2\\theta : This is not acceptable
         If $\\sin^2\\theta = 0.6$, then $\\cos^2\\theta = \\_.$ : This is acceptable
-
-
 """

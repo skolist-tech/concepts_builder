@@ -291,6 +291,25 @@ python solved_examples_builder.py \
     --prompt_file_path ./prompts/maths_6_solved.txt
 ```
 
+By default, chapters whose output JSON already exists are **skipped**. To force reprocessing, use `--reprocess`:
+
+```bash
+python solved_examples_builder.py \
+    --input_dir ./data/rbse/maths_6_corodova \
+    --output_dir ./output/maths_6 \
+    --subject_id 11ea3956-d46e-4476-bb2c-a50afa027f5c \
+    --prompt_file_path ./prompts/maths_6_solved.txt \
+    --reprocess
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--input_dir` | Yes | Subject directory containing chapter PDFs |
+| `--output_dir` | Yes | Output directory for solved examples JSONs (should also contain concept CSVs) |
+| `--subject_id` | Yes | Subject UUID for generating deterministic UUIDs |
+| `--prompt_file_path` | Yes | Path to the prompt file for solved examples extraction |
+| `--reprocess` | No | Reprocess all chapters even if output JSON already exists (default: skip existing) |
+
 **Output:** `{chapter_name}_solved_examples.json` with:
 - `chapter_name`, `chapter_id`, `subject_id`
 - `solved_examples_questions[]` - each with `id`, `question_text`, `explanation`, etc.
@@ -306,6 +325,25 @@ python exercise_questions_builder.py \
     --subject_id 11ea3956-d46e-4476-bb2c-a50afa027f5c \
     --prompt_file_path ./prompts/maths_6_exercises.txt
 ```
+
+By default, chapters whose output JSON already exists are **skipped**. To force reprocessing, use `--reprocess`:
+
+```bash
+python exercise_questions_builder.py \
+    --input_dir ./data/rbse/maths_6_corodova \
+    --output_dir ./output/maths_6 \
+    --subject_id 11ea3956-d46e-4476-bb2c-a50afa027f5c \
+    --prompt_file_path ./prompts/maths_6_exercises.txt \
+    --reprocess
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--input_dir` | Yes | Subject directory containing chapter PDFs |
+| `--output_dir` | Yes | Output directory for exercise question JSONs (should also contain concept CSVs) |
+| `--subject_id` | Yes | Subject UUID for generating deterministic UUIDs |
+| `--prompt_file_path` | Yes | Path to the prompt file for exercise question extraction |
+| `--reprocess` | No | Reprocess all chapters even if output JSON already exists (default: skip existing) |
 
 **Output:** `{chapter_name}_exercise_questions.json`
 
@@ -481,7 +519,7 @@ All uploader commands accept:
 
 ## Parallel Processing
 
-The concept extraction step (`concepts_builder.py`) now processes multiple chapter PDFs in parallel for faster throughput. The maximum number of chapters processed concurrently is controlled by the `MAX_CONCURRENT_GENERATIONS` environment variable (default: 3). This can be set in your `.env` file:
+The builder scripts (`concepts_builder.py`, `solved_examples_builder.py`, and `exercise_questions_builder.py`) process multiple chapter PDFs in parallel for faster throughput. The maximum number of chapters processed concurrently is controlled by the `MAX_CONCURRENT_GENERATIONS` environment variable (default: 3). This can be set in your `.env` file:
 
 ```
 MAX_CONCURRENT_GENERATIONS=3
@@ -500,7 +538,7 @@ MAX_CONCURRENT_GENERATIONS=5 python concepts_builder.py \
     --prompt_file_path ./prompts/maths_6_concepts.txt
 ```
 
-The script will log how many chapters are processed in parallel. All error handling and output remain unchanged.
+The scripts will log how many chapters are processed in parallel. All error handling and output remain unchanged.
 
 ## Troubleshooting
 
