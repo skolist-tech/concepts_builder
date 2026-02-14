@@ -150,8 +150,11 @@ Description:   Central Board of Secondary Education
 Add or get school_class records in Supabase:
 
 ```bash
-# Add a new school class
+# Add a new school class (by board ID)
 python school_class.py --add --board-id 550e8400-e29b-41d4-a716-446655440000 --name "Class 6" --position 6
+
+# Add a new school class (by board name)
+python school_class.py --add --board-name "CBSE" --name "Class 6" --position 6
 
 # Get a specific school class by ID
 python school_class.py --get --school-class-id 7cd86129-fb77-5fae-829a-3a4ec87c1669
@@ -183,7 +186,8 @@ Position:    6
 |----------|----------|-------------|
 | `--add` | Either | Add a new school class (mutually exclusive with --get) |
 | `--get` | Either | Get school class(es) from database (mutually exclusive with --add) |
-| `--board-id` | For add/get | Board UUID (required for add, or to list all classes) |
+| `--board-id` | For add/get | Board UUID (for add or to list all classes) |
+| `--board-name` | For add | Board name to look up (alternative to --board-id; errors if duplicates exist) |
 | `--name` | For add/get | Class name (required for add, optional for get to search by name) |
 | `--position` | For add | Position/order of the class (e.g., 6 for Class 6) |
 | `--school-class-id` | For get | School class UUID to fetch |
@@ -194,8 +198,11 @@ Position:    6
 Add or get subject records in Supabase:
 
 ```bash
-# Add a new subject
+# Add a new subject (by school class ID)
 python subject.py --add --school-class-id 7cd86129-fb77-5fae-829a-3a4ec87c1669 --name "Mathematics"
+
+# Add a new subject (by board name + school class name)
+python subject.py --add --board-name "CBSE" --school-class-name "Class 6" --name "Mathematics"
 
 # Get a specific subject by ID
 python subject.py --get --subject-id 2176654b-2688-5e0c-8910-2e2f8ee596d1
@@ -228,7 +235,9 @@ Subject ID:    2176654b-2688-5e0c-8910-2e2f8ee596d1
 |----------|----------|-------------|
 | `--add` | Either | Add a new subject (mutually exclusive with --get) |
 | `--get` | Either | Get subject(s) from database (mutually exclusive with --add) |
-| `--school-class-id` | For add/get | School class UUID (required for add, or to list all subjects) |
+| `--school-class-id` | For add/get | School class UUID (for add or to list all subjects) |
+| `--board-name` | For add | Board name (use with --school-class-name as alternative to --school-class-id) |
+| `--school-class-name` | For add | School class name (use with --board-name as alternative to --school-class-id) |
 | `--name` | For add/get | Subject name (required for add, optional for get to search by name) |
 | `--subject-id` | For get | Subject UUID to fetch |
 | `--all` | For get | List all subjects |

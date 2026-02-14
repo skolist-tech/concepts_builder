@@ -5,8 +5,11 @@ Subject CLI
 Manage subject records in Supabase.
 
 Usage:
-    # Add a new subject
+    # Add a new subject (by school class ID)
     python subject.py --add --school-class-id <uuid> --name "Mathematics"
+
+    # Add a new subject (by board name + school class name)
+    python subject.py --add --board-name "CBSE" --school-class-name "Class 6" --name "Mathematics"
 
     # Get a specific subject
     python subject.py --get --subject-id <uuid>
@@ -52,6 +55,49 @@ async def get_school_class(client: supabase.Client, school_class_id: str) -> dic
     if result.data and len(result.data) > 0:
         return result.data[0]
     return None
+
+
+async def resolve_school_class_by_names(client: supabase.Client, board_name: str, school_class_name: str) -> dict:
+    """Resolve a school_class by board name + class name. Errors if ambiguous."""
+    # First resolve the board
+    def _fetch_boards():
+        return client.table("boards").select("*").ilike("name", board_name).execute()
+    
+    board_result = await asyncio.get_event_loop().run_in_executor(None, _fetch_boards)
+    boards = board_result.data if board_result.data else []
+    
+    if not boards:
+        logger.error(f"No board found with name: {board_name}")
+        sys.exit(1)
+    
+    if len(boards) > 1:
+        logger.error(f"Multiple boards found with name '{board_name}':")
+        for b in boards:
+            logger.error(f"  - {b['id']}  {b['name']}")
+        logger.error("Use --school-class-id to specify the exact school class.")
+        sys.exit(1)
+    
+    board = boards[0]
+    
+    # Now find the school_class under this board
+    def _fetch_classes():
+        return client.table("school_classes").select("*, boards(name)").eq("board_id", board["id"]).ilike("name", school_class_name).execute()
+    
+    class_result = await asyncio.get_event_loop().run_in_executor(None, _fetch_classes)
+    classes = class_result.data if class_result.data else []
+    
+    if not classes:
+        logger.error(f"No school class '{school_class_name}' found under board '{board_name}'")
+        sys.exit(1)
+    
+    if len(classes) > 1:
+        logger.error(f"Multiple school classes found with name '{school_class_name}' under board '{board_name}':")
+        for c in classes:
+            logger.error(f"  - {c['id']}  {c['name']}")
+        logger.error("Use --school-class-id to specify the exact school class.")
+        sys.exit(1)
+    
+    return classes[0]
 
 
 async def get_subject(client: supabase.Client, subject_id: str) -> dict | None:
@@ -113,14 +159,19 @@ async def upsert_subject(
     return result.data[0] if result.data else subject_record
 
 
-async def add_subject_async(school_class_id: str, subject_name: str) -> None:
+async def add_subject_async(school_class_id: str | None, board_name_arg: str | None, school_class_name_arg: str | None, subject_name: str) -> None:
     """Add a new subject."""
     client = create_supabase_client()
     
-    school_class_data = await get_school_class(client, school_class_id)
-    if not school_class_data:
-        logger.error(f"School class not found: {school_class_id}")
-        sys.exit(1)
+    # Resolve school_class
+    if school_class_id:
+        school_class_data = await get_school_class(client, school_class_id)
+        if not school_class_data:
+            logger.error(f"School class not found: {school_class_id}")
+            sys.exit(1)
+    else:
+        school_class_data = await resolve_school_class_by_names(client, board_name_arg, school_class_name_arg)
+        school_class_id = school_class_data["id"]
     
     school_class_name = school_class_data.get("name", "Unknown")
     board_name = school_class_data.get("boards", {}).get("name", "Unknown") if school_class_data.get("boards") else "Unknown"
@@ -233,7 +284,17 @@ def main():
     parser.add_argument(
         "--school-class-id",
         type=str,
-        help="School class UUID (required for --add, optional for --get to list all subjects)"
+        help="School class UUID (for --add or --get)"
+    )
+    parser.add_argument(
+        "--board-name",
+        type=str,
+        help="Board name (use with --school-class-name as alternative to --school-class-id for --add)"
+    )
+    parser.add_argument(
+        "--school-class-name",
+        type=str,
+        help="School class name (use with --board-name as alternative to --school-class-id for --add)"
     )
     
     # Add arguments / Get by name
@@ -259,16 +320,21 @@ def main():
     
     try:
         if args.add:
-            if not args.school_class_id:
-                parser.error("--school-class-id is required when using --add")
+            has_names = args.board_name and args.school_class_name
+            if not args.school_class_id and not has_names:
+                parser.error("--school-class-id or both --board-name and --school-class-name are required when using --add")
+            if args.board_name and not args.school_class_name:
+                parser.error("--school-class-name is required when using --board-name")
+            if args.school_class_name and not args.board_name:
+                parser.error("--board-name is required when using --school-class-name")
             if not args.name:
                 parser.error("--name is required when using --add")
             
-            if not validate_uuid(args.school_class_id):
+            if args.school_class_id and not validate_uuid(args.school_class_id):
                 print(f"Error: Invalid school-class-id UUID: {args.school_class_id}", file=sys.stderr)
                 sys.exit(1)
             
-            asyncio.run(add_subject_async(args.school_class_id, args.name))
+            asyncio.run(add_subject_async(args.school_class_id, args.board_name, args.school_class_name, args.name))
         
         elif args.get:
             if not args.subject_id and not args.school_class_id and not args.name and not args.all:

@@ -5,8 +5,11 @@ School Class CLI
 Manage school_class records in Supabase.
 
 Usage:
-    # Add a new school class
+    # Add a new school class (by board ID)
     python school_class.py --add --board-id <uuid> --name "Class 6" --position 6
+
+    # Add a new school class (by board name)
+    python school_class.py --add --board-name "CBSE" --name "Class 6" --position 6
 
     # Get a specific school class
     python school_class.py --get --school-class-id <uuid>
@@ -52,6 +55,33 @@ async def get_board(client: supabase.Client, board_id: str) -> dict | None:
     if result.data and len(result.data) > 0:
         return result.data[0]
     return None
+
+
+async def get_boards_by_exact_name(client: supabase.Client, name: str) -> list[dict]:
+    """Fetch boards by exact name (case-insensitive)."""
+    def _fetch():
+        return client.table("boards").select("*").ilike("name", name).execute()
+    
+    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    return result.data if result.data else []
+
+
+async def resolve_board_by_name(client: supabase.Client, board_name: str) -> dict:
+    """Resolve a board by name. Errors if no match or duplicates found."""
+    boards = await get_boards_by_exact_name(client, board_name)
+    
+    if not boards:
+        logger.error(f"No board found with name: {board_name}")
+        sys.exit(1)
+    
+    if len(boards) > 1:
+        logger.error(f"Multiple boards found with name '{board_name}':")
+        for b in boards:
+            logger.error(f"  - {b['id']}  {b['name']}")
+        logger.error("Use --board-id to specify the exact board.")
+        sys.exit(1)
+    
+    return boards[0]
 
 
 async def get_school_class(client: supabase.Client, school_class_id: str) -> dict | None:
@@ -115,15 +145,19 @@ async def upsert_school_class(
     return result.data[0] if result.data else school_class_record
 
 
-async def add_school_class_async(board_id: str, school_class_name: str, position: int) -> None:
+async def add_school_class_async(board_id: str | None, board_name_arg: str | None, school_class_name: str, position: int) -> None:
     """Add a new school class."""
     client = create_supabase_client()
     
-    # Fetch board details
-    board = await get_board(client, board_id)
-    if not board:
-        logger.error(f"Board not found: {board_id}")
-        sys.exit(1)
+    # Resolve board
+    if board_id:
+        board = await get_board(client, board_id)
+        if not board:
+            logger.error(f"Board not found: {board_id}")
+            sys.exit(1)
+    else:
+        board = await resolve_board_by_name(client, board_name_arg)
+        board_id = board["id"]
     
     board_name = board.get("name", "Unknown")
     
@@ -230,7 +264,12 @@ def main():
     parser.add_argument(
         "--board-id",
         type=str,
-        help="Board UUID (required for --add, optional for --get to list all classes)"
+        help="Board UUID (for --add or --get)"
+    )
+    parser.add_argument(
+        "--board-name",
+        type=str,
+        help="Board name to look up (alternative to --board-id for --add; errors if duplicates exist)"
     )
     
     # Add arguments / Get by name
@@ -261,18 +300,18 @@ def main():
     
     try:
         if args.add:
-            if not args.board_id:
-                parser.error("--board-id is required when using --add")
+            if not args.board_id and not args.board_name:
+                parser.error("--board-id or --board-name is required when using --add")
             if not args.name:
                 parser.error("--name is required when using --add")
             if args.position is None:
                 parser.error("--position is required when using --add")
             
-            if not validate_uuid(args.board_id):
+            if args.board_id and not validate_uuid(args.board_id):
                 print(f"Error: Invalid board-id UUID: {args.board_id}", file=sys.stderr)
                 sys.exit(1)
             
-            asyncio.run(add_school_class_async(args.board_id, args.name, args.position))
+            asyncio.run(add_school_class_async(args.board_id, args.board_name, args.name, args.position))
         
         elif args.get:
             if not args.school_class_id and not args.board_id and not args.name and not args.all:
