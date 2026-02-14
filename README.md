@@ -414,6 +414,11 @@ python verify_concept_exercise_solved_example.py \
     --input_dir ./output/maths_6 \
     --check-concepts
 
+# Check concepts with AI-powered suggestions for missing mappings
+python verify_concept_exercise_solved_example.py \
+    --input_dir ./output/maths_6 \
+    --check-concepts --suggest
+
 # Check file naming conventions and position consistency
 python verify_concept_exercise_solved_example.py \
     --input_dir ./output/maths_6 \
@@ -424,6 +429,14 @@ python verify_concept_exercise_solved_example.py \
     --input_dir ./output/maths_6 \
     --check-chapters --check-concepts --check-conventions
 ```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--input_dir` | Yes | Directory containing concept CSVs and question JSONs |
+| `--check-chapters` | Either | Check chapter_name and chapter_id consistency |
+| `--check-concepts` | Either | Check that concepts referenced in questions exist in CSVs |
+| `--check-conventions` | Either | Check file naming conventions and position consistency |
+| `--suggest` | No | Use Gemini AI to suggest correct concept mappings for missing concepts (requires --check-concepts) |
 
 **Output:**
 ```

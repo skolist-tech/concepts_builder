@@ -9,28 +9,36 @@ Three independent verification checks:
 2. --check-concepts: Verify concepts in questions exist in concept CSVs
 3. --check-conventions: Verify file naming conventions and position consistency
 
+Optional:
+--suggest: Use Gemini AI to suggest correct concept mappings for missing concepts
+
 Usage:
     python verify_concept_exercise_solved_example.py --input_dir <directory_path> --check-chapters
     python verify_concept_exercise_solved_example.py --input_dir <directory_path> --check-concepts
+    python verify_concept_exercise_solved_example.py --input_dir <directory_path> --check-concepts --suggest
     python verify_concept_exercise_solved_example.py --input_dir <directory_path> --check-conventions
     python verify_concept_exercise_solved_example.py --input_dir <directory_path> --check-chapters --check-concepts --check-conventions
 """
 
 import argparse
+import asyncio
 import csv
 import json
 import logging
 import re
 import sys
 from pathlib import Path
-from typing import Dict, Any, List, Set, Tuple
+from typing import Dict, Any, List, Set, Tuple, Optional
+from collections import defaultdict
 
 from dotenv import load_dotenv
 
 # Load environment variables first
 load_dotenv()
 
-from config import setup_logging
+from config import setup_logging, settings
+from agents.base import get_gemini_client
+from google.genai import types
 
 # Initialize logging
 setup_logging()
@@ -80,6 +88,7 @@ def load_csv_chapter_info(csv_path: Path) -> Dict[str, Any]:
             "chapter_id": None,
             "chapter_position": None,
             "concepts": set(),
+            "concepts_with_desc": {},
             "internal_inconsistencies": [],
         }
     
@@ -91,15 +100,19 @@ def load_csv_chapter_info(csv_path: Path) -> Dict[str, Any]:
     # Check all rows have consistent chapter_name and chapter_id
     internal_inconsistencies = []
     concepts = set()
+    concepts_with_desc = {}
     
     for i, row in enumerate(rows, 1):
         row_chapter_name = row.get("chapter_name", "").strip()
         row_chapter_id = row.get("chapter_id", "").strip()
         concept_name = row.get("concept_name", "").strip()
+        concept_desc = row.get("concept_description", "").strip()
         
         if concept_name:
             concepts.add(concept_name)
-        
+            concepts_with_desc[concept_name] = concept_desc
+
+
         if row_chapter_name != chapter_name:
             internal_inconsistencies.append(
                 f"Row {i}: chapter_name '{row_chapter_name}' != first row '{chapter_name}'"
@@ -115,6 +128,7 @@ def load_csv_chapter_info(csv_path: Path) -> Dict[str, Any]:
         "chapter_id": chapter_id,
         "chapter_position": chapter_position,
         "concepts": concepts,
+        "concepts_with_desc": concepts_with_desc,
         "internal_inconsistencies": internal_inconsistencies,
     }
 
@@ -137,6 +151,98 @@ def load_json_info(json_path: Path, questions_key: str) -> Dict[str, Any]:
         "concepts_referenced": concepts_referenced,
         "question_count": len(questions),
     }
+
+
+def load_json_questions_with_concepts(json_path: Path, questions_key: str) -> List[Dict[str, Any]]:
+    """
+    Load questions with their text and concepts for suggestion purposes.
+    
+    Returns list of dicts with keys: question_text, concepts, question_index
+    """
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    result = []
+    questions = data.get(questions_key, [])
+    for idx, question in enumerate(questions, 1):
+        question_text = question.get("question_text", "").strip()
+        concepts = [c.strip() for c in question.get("concepts", []) if c]
+        result.append({
+            "question_index": idx,
+            "question_text": question_text,
+            "concepts": concepts,
+        })
+    return result
+
+
+async def get_gemini_concept_suggestion(
+    question_text: str,
+    current_concepts: List[str],
+    available_concepts_with_desc: Dict[str, str],
+    missing_concept: str,
+) -> Optional[str]:
+    """
+    Use Gemini to suggest the correct concept mapping for a question.
+    
+    Args:
+        question_text: The question text
+        current_concepts: List of concepts currently associated with the question
+        available_concepts_with_desc: Dict of {concept_name: concept_description} from CSV
+        missing_concept: The concept name that was not found in CSV
+    
+    Returns:
+        Suggested replacement concept name, or None if no suggestion
+    """
+    try:
+        client = get_gemini_client()
+        
+        # Build the available concepts list for prompt
+        concepts_list = "\n".join(
+            f"- {name}: {desc}" if desc else f"- {name}"
+            for name, desc in sorted(available_concepts_with_desc.items())
+        )
+        
+        prompt = f"""You are helping to fix concept mappings for educational questions.
+
+A question has been mapped to the concept "{missing_concept}", but this concept does not exist in the available concept list.
+
+QUESTION:
+{question_text}
+
+CURRENT CONCEPT MAPPING (may be incorrect):
+{', '.join(current_concepts) if current_concepts else 'None'}
+
+AVAILABLE CONCEPTS FROM THIS CHAPTER (format: "concept_name: description"):
+{concepts_list}
+
+TASK: Suggest the best matching concept from the AVAILABLE CONCEPTS list that this question should be mapped to instead of "{missing_concept}".
+
+CRITICAL RULES:
+1. Output ONLY the concept NAME, NOT the description
+2. If no concept fits, respond with exactly "NONE"
+4. Do NOT include any explanation, colon, or description text
+5. Match the concept name EXACTLY as it appears before the colon in the list above
+
+Example good response: "Rational Numbers"
+Example good response: "Square Roots"
+Example bad response: "Rational Numbers: Definition as numbers expressible in p/q form..."
+
+Your response (concept name only):"""
+
+        response = await client.aio.models.generate_content(
+            model=settings.gemini_model,
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+            ),
+        )
+        
+        suggestion = response.text.strip() if response.text else None
+        return suggestion
+        
+    except Exception as e:
+        logger.warning(f"Gemini suggestion failed: {e}")
+        return None
 
 
 def check_chapter_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, List[Dict]]:
@@ -273,9 +379,16 @@ def find_similar_concepts(missing_concept: str, available_concepts: Set[str], ma
     return sorted(suggestions)[:max_suggestions]
 
 
-def check_concept_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, List[Dict]]:
+async def check_concept_consistency(
+    groups: List[Dict[str, Path]], 
+    suggest: bool = False
+) -> Tuple[int, int, List[Dict]]:
     """
     Check that concepts referenced in questions exist in concept CSVs.
+    
+    Args:
+        groups: List of file groups to check
+        suggest: If True, use Gemini to suggest replacements for missing concepts
     
     Returns:
         Tuple of (passed_count, failed_count, failures_list)
@@ -284,8 +397,13 @@ def check_concept_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, 
     failed = 0
     failures = []
     
+    # Collect all suggestion tasks for parallel execution
+    suggestion_tasks = []  # List of (task_coro, metadata_dict)
+    
     logger.info("=" * 70)
     logger.info("CONCEPT MAPPING CHECK")
+    if suggest:
+        logger.info("(Gemini suggestions enabled for missing concepts)")
     logger.info("=" * 70)
     
     for idx, group in enumerate(groups, 1):
@@ -437,14 +555,50 @@ def check_concept_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, 
                     logger.error(f"         DEBUG: JSON repr={repr(concept_name)}, CSV repr={repr(correct_form)}")
                 else:
                     logger.error(f"      -> {source} MISSING: '{concept_name}'")
-                    # Find and show suggestions only for truly missing concepts
+                    # Find and show substring-based suggestions
                     suggestions = find_similar_concepts(concept_name, available_concepts)
                     if suggestions:
-                        logger.info(f"         Suggestions: {', '.join(suggestions)}")
+                        logger.info(f"         Substring suggestions: {', '.join(suggestions)}")
                         # Debug: if any suggestion looks visually identical, show repr
                         for sug in suggestions:
                             if sug == concept_name or sug.strip() == concept_name.strip():
                                 logger.error(f"         DEBUG: Visually similar! JSON repr={repr(concept_name)}, CSV repr={repr(sug)}")
+                    
+                    # If suggest mode enabled, collect tasks for AI-based suggestions
+                    if suggest:
+                        concepts_with_desc = csv_info.get("concepts_with_desc", {})
+                        # Find questions referencing this missing concept
+                        questions_with_missing = []
+                        
+                        if exercise_path and source in ("[Exercise]", "[Both]"):
+                            exercise_questions = load_json_questions_with_concepts(exercise_path, "exercise_questions")
+                            for q in exercise_questions:
+                                if concept_name in q["concepts"]:
+                                    questions_with_missing.append(("Exercise", q))
+                        
+                        if solved_path and source in ("[Solved]", "[Both]"):
+                            solved_questions = load_json_questions_with_concepts(solved_path, "solved_examples_questions")
+                            for q in solved_questions:
+                                if concept_name in q["concepts"]:
+                                    questions_with_missing.append(("Solved", q))
+                        
+                        if questions_with_missing:
+                            logger.info(f"         Queuing AI suggestions for {len(questions_with_missing)} question(s)...")
+                            for q_source, q in questions_with_missing[:3]:  # Limit to 3 questions per concept
+                                task_coro = get_gemini_concept_suggestion(
+                                    question_text=q["question_text"],
+                                    current_concepts=q["concepts"],
+                                    available_concepts_with_desc=concepts_with_desc,
+                                    missing_concept=concept_name,
+                                )
+                                suggestion_tasks.append({
+                                    "coro": task_coro,
+                                    "prefix": prefix,
+                                    "concept_name": concept_name,
+                                    "q_source": q_source,
+                                    "q_index": q["question_index"],
+                                    "q_text": q["question_text"],
+                                })
             
             failures.append({
                 "prefix": prefix,
@@ -460,6 +614,68 @@ def check_concept_consistency(groups: List[Dict[str, Path]]) -> Tuple[int, int, 
         logger.error(f"Concept check: {passed} passed, {failed} failed")
     else:
         logger.info(f"Concept check: {passed} passed, {failed} failed")
+    
+    # Run all AI suggestion tasks in parallel with concurrency limit
+    if suggestion_tasks:
+        logger.info("")
+        logger.info("=" * 70)
+        max_concurrent = getattr(settings, "max_concurrent_generations", 3)
+        logger.info(f"RUNNING {len(suggestion_tasks)} AI SUGGESTION TASKS (max {max_concurrent} concurrent)...")
+        logger.info("=" * 70)
+        
+        # Create semaphore for concurrency control
+        sem = asyncio.Semaphore(max_concurrent)
+        
+        async def run_with_semaphore(task_meta):
+            async with sem:
+                return await task_meta["coro"]
+        
+        # Run all tasks with semaphore
+        results = await asyncio.gather(
+            *[run_with_semaphore(t) for t in suggestion_tasks],
+            return_exceptions=True
+        )
+        
+        # Attach results to task metadata
+        for task_meta, result in zip(suggestion_tasks, results):
+            task_meta["result"] = result
+        
+        # Group results by chapter prefix
+        results_by_chapter = defaultdict(list)
+        for task_meta in suggestion_tasks:
+            results_by_chapter[task_meta["prefix"]].append(task_meta)
+        
+        # Output results sequentially per chapter
+        for prefix in sorted(results_by_chapter.keys()):
+            chapter_tasks = results_by_chapter[prefix]
+            logger.info(f"")
+            logger.info(f"  Chapter: {prefix}")
+            logger.info(f"  {'-' * 60}")
+            
+            for task_meta in chapter_tasks:
+                concept_name = task_meta["concept_name"]
+                q_source = task_meta["q_source"]
+                q_index = task_meta["q_index"]
+                q_text = task_meta["q_text"]
+                result = task_meta["result"]
+                
+                q_snippet = q_text[:100] + "..." if len(q_text) > 100 else q_text
+                
+                if isinstance(result, Exception):
+                    logger.warning(f"    [{q_source} Q#{q_index}] AI suggestion failed: {result}")
+                elif result and result != "NONE":
+                    logger.info(f"    [{q_source} Q#{q_index}]")
+                    logger.info(f"       Question: {q_snippet}")
+                    logger.info(f"       Missing Concept: {concept_name}")
+                    logger.info(f"       Suggested Concept: {result}")
+                elif result == "NONE":
+                    logger.warning(f"    [{q_source} Q#{q_index}]")
+                    logger.warning(f"       Question: {q_snippet}")
+                    logger.warning(f"       Missing Concept: {concept_name}")
+                    logger.warning(f"       Suggested Concept: (no match found)")
+        
+        logger.info("")
+        logger.info("=" * 70)
     
     return passed, failed, failures
 
@@ -597,6 +813,11 @@ def main():
         help="Check that concepts in questions exist in CSVs"
     )
     parser.add_argument(
+        "--suggest",
+        action="store_true",
+        help="Use Gemini AI to suggest correct concept mappings for missing concepts (requires --check-concepts)"
+    )
+    parser.add_argument(
         "--check-conventions",
         action="store_true",
         help="Check file naming conventions and position consistency"
@@ -608,6 +829,11 @@ def main():
     # Require at least one check
     if not args.check_chapters and not args.check_concepts and not args.check_conventions:
         logger.error("Please specify at least one check: --check-chapters, --check-concepts, or --check-conventions")
+        sys.exit(1)
+    
+    # --suggest requires --check-concepts
+    if args.suggest and not args.check_concepts:
+        logger.error("--suggest requires --check-concepts to be enabled")
         sys.exit(1)
     
     logger.info(f"Input directory: {input_dir}")
@@ -626,7 +852,7 @@ def main():
             logger.info("")
         
         if args.check_concepts:
-            _, co_failed, _ = check_concept_consistency(groups)
+            _, co_failed, _ = asyncio.run(check_concept_consistency(groups, suggest=args.suggest))
             total_failed += co_failed
             logger.info("")
         
