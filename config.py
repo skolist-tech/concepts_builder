@@ -34,29 +34,6 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         extra = "ignore"
-    
-    @property
-    def rbse_data_dir(self) -> Path:
-        """RBSE input data directory."""
-        return self.data_dir / "rbse"
-    
-    @property
-    def rbse_output_dir(self) -> Path:
-        """RBSE output directory."""
-        return self.data_dir / "rbse_output"
-    
-    @property
-    def ncert_data_dir(self) -> Path:
-        """NCERT input data directory."""
-        return self.data_dir / "ncert"
-    
-    def get_subject_input_dir(self, subject: str) -> Path:
-        """Get input directory for a specific subject."""
-        return self.rbse_data_dir / subject
-    
-    def get_subject_output_dir(self, subject: str) -> Path:
-        """Get output directory for a specific subject."""
-        return self.rbse_output_dir / subject
 
 
 @lru_cache()

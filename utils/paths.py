@@ -25,7 +25,7 @@ def get_chapter_paths(
         List of Path objects for each chapter PDF.
     """
     if input_dir is None:
-        input_dir = settings.get_subject_input_dir("maths_6_corodova")
+        raise ValueError("Input directory must be provided")
     
     input_dir = Path(input_dir)
     
@@ -72,7 +72,7 @@ def get_concepts_csv_path(
         Path for the concepts CSV file.
     """
     if output_dir is None:
-        output_dir = settings.get_subject_output_dir("maths_6_corodova")
+        raise ValueError("Output directory must be provided")
     
     chapter_name = get_chapter_name(chapter_pdf_path)
     return Path(output_dir) / f"{chapter_name}_concepts.csv"
@@ -93,7 +93,7 @@ def get_solved_examples_json_path(
         Path for the solved examples JSON file.
     """
     if output_dir is None:
-        output_dir = settings.get_subject_output_dir("maths_6_corodova")
+        raise ValueError("Output directory must be provided")
     
     chapter_name = get_chapter_name(chapter_pdf_path)
     return Path(output_dir) / f"{chapter_name}_solved_examples.json"
@@ -114,7 +114,7 @@ def get_solved_examples_pdf_path(
         Path for the solved examples PDF file.
     """
     if output_dir is None:
-        output_dir = settings.get_subject_output_dir("maths_6_corodova")
+        raise ValueError("Output directory must be provided")
     
     chapter_name = get_chapter_name(chapter_pdf_path)
     return Path(output_dir) / f"{chapter_name}_solved_examples.pdf"
@@ -135,7 +135,7 @@ def get_exercise_questions_json_path(
         Path for the exercise questions JSON file.
     """
     if output_dir is None:
-        output_dir = settings.get_subject_output_dir("maths_6_corodova")
+        raise ValueError("Output directory must be provided")
     
     chapter_name = get_chapter_name(chapter_pdf_path)
     return Path(output_dir) / f"{chapter_name}_exercise_questions.json"
@@ -156,7 +156,7 @@ def get_exercise_questions_pdf_path(
         Path for the exercise questions PDF file.
     """
     if output_dir is None:
-        output_dir = settings.get_subject_output_dir("maths_6_corodova")
+        raise ValueError("Output directory must be provided")
     
     chapter_name = get_chapter_name(chapter_pdf_path)
     return Path(output_dir) / f"{chapter_name}_exercise_questions.pdf"
@@ -173,7 +173,7 @@ def ensure_output_dir(output_dir: Optional[Path] = None) -> Path:
         The output directory path.
     """
     if output_dir is None:
-        output_dir = settings.get_subject_output_dir("maths_6_corodova")
+        raise ValueError("Output directory must be provided")
     
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
