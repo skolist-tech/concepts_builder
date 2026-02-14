@@ -460,6 +460,29 @@ All uploader commands accept:
 |----------|----------|-------------|
 | `--input_dir` | Yes | Directory containing CSV/JSON files to upload |
 
+## Parallel Processing
+
+The concept extraction step (`concepts_builder.py`) now processes multiple chapter PDFs in parallel for faster throughput. The maximum number of chapters processed concurrently is controlled by the `MAX_CONCURRENT_GENERATIONS` environment variable (default: 3). This can be set in your `.env` file:
+
+```
+MAX_CONCURRENT_GENERATIONS=3
+```
+
+- If you want to limit resource usage (e.g., API rate limits), lower this value.
+- For maximum speed (if your API quota and machine allow), increase it.
+
+**Example:**
+
+```bash
+MAX_CONCURRENT_GENERATIONS=5 python concepts_builder.py \
+    --input_dir ./data/rbse/maths_6_corodova \
+    --output_dir ./output/maths_6 \
+    --subject_id 11ea3956-d46e-4476-bb2c-a50afa027f5c \
+    --prompt_file_path ./prompts/maths_6_concepts.txt
+```
+
+The script will log how many chapters are processed in parallel. All error handling and output remain unchanged.
+
 ## Troubleshooting
 
 ### "GEMINI_API_KEY not set"
@@ -516,4 +539,3 @@ concepts_builder/
     ├── uuid_generator.py        # Deterministic UUID5 generation
     ├── prompt_loader.py         # Load prompts from files
     └── add_uuids_to_existing.py # Add UUIDs to legacy files
-```

@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-from config import setup_logging
+from config import setup_logging, settings
 from pipelines.concept_pipeline import process_chapter_for_concepts
 from utils.prompt_loader import load_prompt
 from utils.uuid_generator import validate_uuid
@@ -59,31 +59,41 @@ async def process_all_chapters(
     """Process all chapter PDFs in the input directory."""
     pdf_files = get_pdf_files(input_dir)
     logger.info(f"Found {len(pdf_files)} PDF files to process")
-    
+
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    max_concurrent = getattr(settings, "max_concurrent_generations", 3)
+    logger.info(f"Using max_concurrent_generations={max_concurrent}")
+
     successful = 0
     failed = 0
-    
-    for i, pdf_path in enumerate(pdf_files, 1):
+
+    sem = asyncio.Semaphore(max_concurrent)
+    results = []
+
+    async def process_one(i, pdf_path):
         output_csv_path = get_output_csv_path(pdf_path, output_dir)
         logger.info(f"[{i}/{len(pdf_files)}] Processing: {pdf_path.name}")
-        
-        try:
-            await process_chapter_for_concepts(
-                chapter_pdf_path=pdf_path,
-                prompt=prompt,
-                subject_id=subject_id,
-                output_csv_path=output_csv_path,
-                chapter_position=i
-            )
-            successful += 1
-            logger.info(f"[{i}/{len(pdf_files)}] Saved: {output_csv_path.name}")
-        except Exception as e:
-            failed += 1
-            logger.error(f"[{i}/{len(pdf_files)}] Failed: {pdf_path.name} - {e}")
-    
+        async with sem:
+            try:
+                await process_chapter_for_concepts(
+                    chapter_pdf_path=pdf_path,
+                    prompt=prompt,
+                    subject_id=subject_id,
+                    output_csv_path=output_csv_path,
+                    chapter_position=i
+                )
+                logger.info(f"[{i}/{len(pdf_files)}] Saved: {output_csv_path.name}")
+                return True
+            except Exception as e:
+                logger.error(f"[{i}/{len(pdf_files)}] Failed: {pdf_path.name} - {e}")
+                return False
+
+    tasks = [process_one(i, pdf_path) for i, pdf_path in enumerate(pdf_files, 1)]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    successful = sum(1 for r in results if r is True)
+    failed = len(results) - successful
     logger.info(f"Completed: {successful} successful, {failed} failed out of {len(pdf_files)}")
 
 
