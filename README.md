@@ -10,9 +10,10 @@ This tool provides CLI commands for the content extraction pipeline:
 - **`generate_school_class_id.py`** - Generate school_class UUID from board_id + school_class_name
 - **`generate_subject_id.py`** - Generate subject UUID from school_class_id + subject_name
 
-### Database Record Commands (Create in Supabase)
-- **`add_school_class.py`** - Create school_class record in Supabase with deterministic UUID
-- **`add_subject.py`** - Create subject record in Supabase with deterministic UUID
+### Database Record Commands (Manage records in Supabase)
+- **`boards.py`** - Add or get board records in Supabase
+- **`school_class.py`** - Add or get school_class records in Supabase with deterministic UUID
+- **`subject.py`** - Add or get subject records in Supabase with deterministic UUID
 
 ### Generation Commands (PDF → CSV/JSON with UUIDs)
 1. **`concepts_builder.py`** - Extract concepts from PDFs → CSV with chapter/topic/concept UUIDs
@@ -106,18 +107,66 @@ python generate_subject_id.py \
 
 Use the generated `subject_id` in the builder commands below.
 
-### Add School Class (to Supabase)
+### Manage Boards
 
-Create a school_class record in Supabase with a deterministic UUID:
+Add or get board records in Supabase:
 
 ```bash
-python add_school_class.py \
-    --board_id 550e8400-e29b-41d4-a716-446655440000 \
-    --school_class_name "Class 6" \
-    --position 6
+# Add a new board
+python boards.py --add-board --name "CBSE" --description "Central Board of Secondary Education"
+
+# Get a specific board by ID
+python boards.py --get-board --board-id 550e8400-e29b-41d4-a716-446655440000
+
+# Search boards by name (case-insensitive, partial match)
+python boards.py --get-board --name "CBSE"
+
+# List all boards
+python boards.py --get-board --all
 ```
 
-**Output:**
+**Output (add):**
+```
+==================================================
+Board Created Successfully
+==================================================
+Board ID:      550e8400-e29b-41d4-a716-446655440000
+Board Name:    CBSE
+Description:   Central Board of Secondary Education
+==================================================
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--add-board` | Either | Add a new board (mutually exclusive with --get-board) |
+| `--get-board` | Either | Get board(s) from database (mutually exclusive with --add-board) |
+| `--name` | For add/get | Board name (required for add, optional for get to search by name) |
+| `--description` | No | Board description |
+| `--board-id` | For get | Board UUID to fetch |
+| `--all` | For get | List all boards |
+
+### Manage School Classes
+
+Add or get school_class records in Supabase:
+
+```bash
+# Add a new school class
+python school_class.py --add --board-id 550e8400-e29b-41d4-a716-446655440000 --name "Class 6" --position 6
+
+# Get a specific school class by ID
+python school_class.py --get --school-class-id 7cd86129-fb77-5fae-829a-3a4ec87c1669
+
+# Search school classes by name (case-insensitive, partial match)
+python school_class.py --get --name "Class 6"
+
+# List all school classes for a board
+python school_class.py --get --board-id 550e8400-e29b-41d4-a716-446655440000
+
+# List all school classes
+python school_class.py --get --all
+```
+
+**Output (add):**
 ```
 ==================================================
 School Class Created Successfully
@@ -132,21 +181,36 @@ Position:    6
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--board_id` | Yes | Board UUID (must exist in Supabase) |
-| `--school_class_name` | Yes | Class name (e.g., "Class 6", "Class 10") |
-| `--position` | Yes | Position/order of the class (e.g., 6 for Class 6) |
+| `--add` | Either | Add a new school class (mutually exclusive with --get) |
+| `--get` | Either | Get school class(es) from database (mutually exclusive with --add) |
+| `--board-id` | For add/get | Board UUID (required for add, or to list all classes) |
+| `--name` | For add/get | Class name (required for add, optional for get to search by name) |
+| `--position` | For add | Position/order of the class (e.g., 6 for Class 6) |
+| `--school-class-id` | For get | School class UUID to fetch |
+| `--all` | For get | List all school classes |
 
-### Add Subject (to Supabase)
+### Manage Subjects
 
-Create a subject record in Supabase with a deterministic UUID:
+Add or get subject records in Supabase:
 
 ```bash
-python add_subject.py \
-    --school_class_id 7cd86129-fb77-5fae-829a-3a4ec87c1669 \
-    --subject_name "Mathematics"
+# Add a new subject
+python subject.py --add --school-class-id 7cd86129-fb77-5fae-829a-3a4ec87c1669 --name "Mathematics"
+
+# Get a specific subject by ID
+python subject.py --get --subject-id 2176654b-2688-5e0c-8910-2e2f8ee596d1
+
+# Search subjects by name (case-insensitive, partial match)
+python subject.py --get --name "Math"
+
+# List all subjects for a school class
+python subject.py --get --school-class-id 7cd86129-fb77-5fae-829a-3a4ec87c1669
+
+# List all subjects
+python subject.py --get --all
 ```
 
-**Output:**
+**Output (add):**
 ```
 ==================================================
 Subject Created Successfully
@@ -162,8 +226,12 @@ Subject ID:    2176654b-2688-5e0c-8910-2e2f8ee596d1
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--school_class_id` | Yes | School class UUID (must exist in Supabase) |
-| `--subject_name` | Yes | Subject name (e.g., "Mathematics", "Science") |
+| `--add` | Either | Add a new subject (mutually exclusive with --get) |
+| `--get` | Either | Get subject(s) from database (mutually exclusive with --add) |
+| `--school-class-id` | For add/get | School class UUID (required for add, or to list all subjects) |
+| `--name` | For add/get | Subject name (required for add, optional for get to search by name) |
+| `--subject-id` | For get | Subject UUID to fetch |
+| `--all` | For get | List all subjects |
 
 ### Step 1: Generate Concepts
 
@@ -411,8 +479,9 @@ concepts_builder/
 ├── concepts_uploader.py         # CLI: CSV → Supabase
 ├── exercise_questions_uploader.py # CLI: JSON → Supabase
 ├── solved_examples_uploader.py  # CLI: JSON → Supabase
-├── add_school_class.py          # CLI: Create school_class in Supabase
-├── add_subject.py               # CLI: Create subject in Supabase
+├── boards.py                    # CLI: Add/get board records in Supabase
+├── school_class.py              # CLI: Add/get school_class records in Supabase
+├── subject.py                   # CLI: Add/get subject records in Supabase
 ├── generate_school_class_id.py  # CLI: board_id + school_class_name → school_class_id
 ├── generate_subject_id.py       # CLI: school_class_id + subject_name → subject_id
 ├── migrate_add_uuids.py         # CLI: Add UUIDs to legacy files
