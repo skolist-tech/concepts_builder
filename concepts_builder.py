@@ -93,7 +93,7 @@ async def process_all_chapters(
     tasks = [process_one(i, pdf_path) for i, pdf_path in enumerate(pdf_files, 1)]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     successful = sum(1 for r in results if r is True)
-    failed = len(results) - successful
+    failed = sum(1 for r in results if r is False or isinstance(r, Exception))
     logger.info(f"Completed: {successful} successful, {failed} failed out of {len(pdf_files)}")
 
 
