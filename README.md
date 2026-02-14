@@ -254,6 +254,25 @@ python concepts_builder.py \
     --prompt_file_path ./prompts/maths_6_concepts.txt
 ```
 
+By default, chapters whose output CSV already exists in the output directory are **skipped**. To force reprocessing of all chapters (overwriting existing CSVs), use `--reprocess`:
+
+```bash
+python concepts_builder.py \
+    --input_dir ./data/rbse/maths_6_corodova \
+    --output_dir ./output/maths_6 \
+    --subject_id 11ea3956-d46e-4476-bb2c-a50afa027f5c \
+    --prompt_file_path ./prompts/maths_6_concepts.txt \
+    --reprocess
+```
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--input_dir` | Yes | Subject directory containing chapter PDFs |
+| `--output_dir` | Yes | Output directory for concept CSVs |
+| `--subject_id` | Yes | Subject UUID for generating deterministic UUIDs |
+| `--prompt_file_path` | Yes | Path to the prompt file for concept extraction |
+| `--reprocess` | No | Reprocess all chapters even if output CSV already exists (default: skip existing) |
+
 **Output:** `{chapter_name}_concepts.csv` with columns:
 - `concept_id`, `concept_name`, `concept_description`, `concept_page_number`
 - `topic_id`, `topic_name`, `topic_description`, `topic_position`

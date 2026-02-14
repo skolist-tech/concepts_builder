@@ -54,7 +54,8 @@ async def process_all_chapters(
     input_dir: Path,
     output_dir: Path,
     subject_id: str,
-    prompt: str
+    prompt: str,
+    reprocess: bool = False
 ) -> None:
     """Process all chapter PDFs in the input directory."""
     pdf_files = get_pdf_files(input_dir)
@@ -74,6 +75,9 @@ async def process_all_chapters(
 
     async def process_one(i, pdf_path):
         output_csv_path = get_output_csv_path(pdf_path, output_dir)
+        if not reprocess and output_csv_path.exists():
+            logger.info(f"[{i}/{len(pdf_files)}] Already processed earlier: {output_csv_path.name}, skipping")
+            return None  # neither success nor failure, just skipped
         logger.info(f"[{i}/{len(pdf_files)}] Processing: {pdf_path.name}")
         async with sem:
             try:
@@ -93,8 +97,9 @@ async def process_all_chapters(
     tasks = [process_one(i, pdf_path) for i, pdf_path in enumerate(pdf_files, 1)]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     successful = sum(1 for r in results if r is True)
+    skipped = sum(1 for r in results if r is None)
     failed = sum(1 for r in results if r is False or isinstance(r, Exception))
-    logger.info(f"Completed: {successful} successful, {failed} failed out of {len(pdf_files)}")
+    logger.info(f"Completed: {successful} successful, {skipped} skipped, {failed} failed out of {len(pdf_files)}")
 
 
 def main():
@@ -125,6 +130,12 @@ def main():
         required=True,
         help="Path to the prompt file for concept extraction"
     )
+    parser.add_argument(
+        "--reprocess",
+        action="store_true",
+        default=False,
+        help="Reprocess all chapters even if output CSV already exists (override skipping of already processed chapters)"
+    )
     
     args = parser.parse_args()
     
@@ -146,13 +157,17 @@ def main():
     logger.info(f"Input directory: {input_dir}")
     logger.info(f"Output directory: {output_dir}")
     logger.info(f"Subject ID: {args.subject_id}")
-    
+    if not args.reprocess:
+        logger.info("Skipping chapters with existing output CSVs (use --reprocess to force reprocessing)")
+    else:
+        logger.warning("Reprocessing all chapters (existing output CSVs will be overwritten)")
     try:
         asyncio.run(process_all_chapters(
             input_dir=input_dir,
             output_dir=output_dir,
             subject_id=args.subject_id,
-            prompt=prompt
+            prompt=prompt,
+            reprocess=args.reprocess
         ))
     except (FileNotFoundError, ValueError) as e:
         logger.error(str(e))
