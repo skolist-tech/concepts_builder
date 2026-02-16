@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-import supabase
+from supabase import acreate_client, AsyncClient
 
 from config import setup_logging, settings
 from schemas.bank_questions.solved_bank_to_json import load_solved_bank_json
@@ -73,15 +73,15 @@ def is_empty_string(s: Optional[str]) -> bool:
     return s is None or str(s).strip() == ""
 
 
-def create_supabase_client() -> supabase.Client:
-    """Create and return a Supabase client."""
+async def create_supabase_client() -> AsyncClient:
+    """Create and return a Supabase async client."""
     url = settings.supabase_url
     key = settings.supabase_service_key
     
     if not url or not key:
         raise ValueError("SUPABASE_URL or SUPABASE_SERVICE_KEY not set in environment")
     
-    return supabase.Client(url, key)
+    return await acreate_client(url, key)
 
 
 def get_json_files(input_dir: Path) -> List[Path]:
@@ -97,22 +97,19 @@ def get_json_files(input_dir: Path) -> List[Path]:
 
 
 async def fetch_concept_id_mapping(
-    client: supabase.Client,
+    client: AsyncClient,
     subject_id: str
 ) -> Dict[str, str]:
     """Fetch concept name to ID mapping for a subject."""
     concept_to_id = {}
     
     try:
-        def _fetch():
-            return (
-                client.table("concepts")
-                .select("id, name, topics!inner(chapters!inner(subject_id))")
-                .eq("topics.chapters.subject_id", subject_id)
-                .execute()
-            )
-        
-        response = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+        response = await (
+            client.table("concepts")
+            .select("id, name, topics!inner(chapters!inner(subject_id))")
+            .eq("topics.chapters.subject_id", subject_id)
+            .execute()
+        )
         
         if hasattr(response, 'data') and response.data:
             for concept in response.data:
@@ -176,7 +173,7 @@ def question_to_db_record(
 
 
 async def upload_solved_examples_from_json(
-    client: supabase.Client,
+    client: AsyncClient,
     json_path: Path
 ) -> Dict[str, int]:
     """
@@ -247,10 +244,7 @@ async def upload_solved_examples_from_json(
     questions_upserted = 0
     if batch_questions:
         try:
-            def _upsert_questions():
-                return client.table("bank_questions").upsert(batch_questions).execute()
-            
-            await asyncio.get_event_loop().run_in_executor(None, _upsert_questions)
+            await client.table("bank_questions").upsert(batch_questions).execute()
             questions_upserted = len(batch_questions)
             logger.info(f"Upserted {questions_upserted} questions")
         except Exception as e:
@@ -261,10 +255,7 @@ async def upload_solved_examples_from_json(
     maps_upserted = 0
     if batch_concept_maps:
         try:
-            def _upsert_maps():
-                return client.table("bank_questions_concepts_maps").upsert(batch_concept_maps).execute()
-            
-            await asyncio.get_event_loop().run_in_executor(None, _upsert_maps)
+            await client.table("bank_questions_concepts_maps").upsert(batch_concept_maps).execute()
             maps_upserted = len(batch_concept_maps)
             logger.info(f"Upserted {maps_upserted} concept maps")
         except Exception as e:
@@ -284,7 +275,7 @@ async def upload_all_solved_examples(input_dir: Path) -> None:
     json_files = get_json_files(input_dir)
     logger.info(f"Found {len(json_files)} solved examples JSON files to upload")
     
-    client = create_supabase_client()
+    client = await create_supabase_client()
     
     total_questions = 0
     total_maps = 0

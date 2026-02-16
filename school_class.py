@@ -26,7 +26,7 @@ import sys
 from dotenv import load_dotenv
 load_dotenv()
 
-import supabase
+from supabase import acreate_client, AsyncClient
 from config import setup_logging, settings
 from utils.uuid_generator import generate_school_class_id, validate_uuid
 
@@ -34,39 +34,33 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def create_supabase_client() -> supabase.Client:
-    """Create and return a Supabase client."""
+async def create_supabase_client() -> AsyncClient:
+    """Create and return a Supabase async client."""
     url = settings.supabase_url
     key = settings.supabase_service_key
     
     if not url or not key:
         raise ValueError("SUPABASE_URL or SUPABASE_SERVICE_KEY not set in environment")
     
-    return supabase.Client(url, key)
+    return await acreate_client(url, key)
 
 
-async def get_board(client: supabase.Client, board_id: str) -> dict | None:
+async def get_board(client: AsyncClient, board_id: str) -> dict | None:
     """Fetch board details from Supabase."""
-    def _fetch():
-        return client.table("boards").select("*").eq("id", board_id).execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("boards").select("*").eq("id", board_id).execute()
     
     if result.data and len(result.data) > 0:
         return result.data[0]
     return None
 
 
-async def get_boards_by_exact_name(client: supabase.Client, name: str) -> list[dict]:
+async def get_boards_by_exact_name(client: AsyncClient, name: str) -> list[dict]:
     """Fetch boards by exact name (case-insensitive)."""
-    def _fetch():
-        return client.table("boards").select("*").ilike("name", name).execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("boards").select("*").ilike("name", name).execute()
     return result.data if result.data else []
 
 
-async def resolve_board_by_name(client: supabase.Client, board_name: str) -> dict:
+async def resolve_board_by_name(client: AsyncClient, board_name: str) -> dict:
     """Resolve a board by name. Errors if no match or duplicates found."""
     boards = await get_boards_by_exact_name(client, board_name)
     
@@ -84,47 +78,35 @@ async def resolve_board_by_name(client: supabase.Client, board_name: str) -> dic
     return boards[0]
 
 
-async def get_school_class(client: supabase.Client, school_class_id: str) -> dict | None:
+async def get_school_class(client: AsyncClient, school_class_id: str) -> dict | None:
     """Fetch a single school_class by ID with board info."""
-    def _fetch():
-        return client.table("school_classes").select("*, boards(name)").eq("id", school_class_id).execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("school_classes").select("*, boards(name)").eq("id", school_class_id).execute()
     
     if result.data and len(result.data) > 0:
         return result.data[0]
     return None
 
 
-async def get_school_classes_by_board(client: supabase.Client, board_id: str) -> list[dict]:
+async def get_school_classes_by_board(client: AsyncClient, board_id: str) -> list[dict]:
     """Fetch all school_classes for a board."""
-    def _fetch():
-        return client.table("school_classes").select("*, boards(name)").eq("board_id", board_id).order("position").execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("school_classes").select("*, boards(name)").eq("board_id", board_id).order("position").execute()
     return result.data if result.data else []
 
 
-async def get_school_classes_by_name(client: supabase.Client, name: str) -> list[dict]:
+async def get_school_classes_by_name(client: AsyncClient, name: str) -> list[dict]:
     """Fetch school_classes by name (case-insensitive)."""
-    def _fetch():
-        return client.table("school_classes").select("*, boards(name)").ilike("name", f"%{name}%").order("name").execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("school_classes").select("*, boards(name)").ilike("name", f"%{name}%").order("name").execute()
     return result.data if result.data else []
 
 
-async def get_all_school_classes(client: supabase.Client) -> list[dict]:
+async def get_all_school_classes(client: AsyncClient) -> list[dict]:
     """Fetch all school_classes from Supabase."""
-    def _fetch():
-        return client.table("school_classes").select("*, boards(name)").order("name").execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("school_classes").select("*, boards(name)").order("name").execute()
     return result.data if result.data else []
 
 
 async def upsert_school_class(
-    client: supabase.Client,
+    client: AsyncClient,
     school_class_id: str,
     school_class_name: str,
     board_id: str,
@@ -138,16 +120,13 @@ async def upsert_school_class(
         "position": position,
     }
     
-    def _upsert():
-        return client.table("school_classes").upsert(school_class_record).execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _upsert)
+    result = await client.table("school_classes").upsert(school_class_record).execute()
     return result.data[0] if result.data else school_class_record
 
 
 async def add_school_class_async(board_id: str | None, board_name_arg: str | None, school_class_name: str, position: int) -> None:
     """Add a new school class."""
-    client = create_supabase_client()
+    client = await create_supabase_client()
     
     # Resolve board
     if board_id:
@@ -184,7 +163,7 @@ async def add_school_class_async(board_id: str | None, board_name_arg: str | Non
 
 async def get_school_class_async(school_class_id: str | None, board_id: str | None, name: str | None, all_classes: bool) -> None:
     """Get school class(es) from database."""
-    client = create_supabase_client()
+    client = await create_supabase_client()
     
     if all_classes or board_id or name:
         if all_classes:

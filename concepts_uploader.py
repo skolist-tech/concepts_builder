@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-import supabase
+from supabase import acreate_client, AsyncClient
 
 from config import setup_logging, settings
 from schemas.chapter_to_csv import load_csv_with_uuids
@@ -30,15 +30,15 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def create_supabase_client() -> supabase.Client:
-    """Create and return a Supabase client."""
+async def create_supabase_client() -> AsyncClient:
+    """Create and return a Supabase async client."""
     url = settings.supabase_url
     key = settings.supabase_service_key
     
     if not url or not key:
         raise ValueError("SUPABASE_URL or SUPABASE_SERVICE_KEY not set in environment")
     
-    return supabase.Client(url, key)
+    return await acreate_client(url, key)
 
 
 def get_csv_files(input_dir: Path) -> List[Path]:
@@ -54,7 +54,7 @@ def get_csv_files(input_dir: Path) -> List[Path]:
 
 
 async def upload_concepts_from_csv(
-    client: supabase.Client,
+    client: AsyncClient,
     csv_path: Path,
     subject_id_override: str | None = None
 ) -> Dict[str, int]:
@@ -119,10 +119,7 @@ async def upload_concepts_from_csv(
     # Upload chapter
     chapters_upserted = 0
     try:
-        def _upsert_chapter():
-            return client.table("chapters").upsert(chapter_record).execute()
-        
-        await asyncio.get_event_loop().run_in_executor(None, _upsert_chapter)
+        await client.table("chapters").upsert(chapter_record).execute()
         chapters_upserted = 1
         logger.info(f"Upserted chapter: {chapter_data['name']} (id: {chapter_data['id']})")
     except Exception as e:
@@ -133,10 +130,7 @@ async def upload_concepts_from_csv(
     topics_upserted = 0
     if topic_records:
         try:
-            def _upsert_topics():
-                return client.table("topics").upsert(topic_records).execute()
-            
-            await asyncio.get_event_loop().run_in_executor(None, _upsert_topics)
+            await client.table("topics").upsert(topic_records).execute()
             topics_upserted = len(topic_records)
             logger.info(f"Upserted {topics_upserted} topics")
         except Exception as e:
@@ -147,10 +141,7 @@ async def upload_concepts_from_csv(
     concepts_upserted = 0
     if concept_records:
         try:
-            def _upsert_concepts():
-                return client.table("concepts").upsert(concept_records).execute()
-            
-            await asyncio.get_event_loop().run_in_executor(None, _upsert_concepts)
+            await client.table("concepts").upsert(concept_records).execute()
             concepts_upserted = len(concept_records)
             logger.info(f"Upserted {concepts_upserted} concepts")
         except Exception as e:
@@ -172,7 +163,7 @@ async def upload_all_concepts(input_dir: Path, subject_id: str | None = None) ->
     if subject_id:
         logger.info(f"Using subject ID override: {subject_id}")
     
-    client = create_supabase_client()
+    client = await create_supabase_client()
     
     total_chapters = 0
     total_topics = 0

@@ -24,7 +24,7 @@ import uuid
 from dotenv import load_dotenv
 load_dotenv()
 
-import supabase
+from supabase import acreate_client, AsyncClient
 from config import setup_logging, settings
 from utils.uuid_generator import validate_uuid
 
@@ -32,49 +32,40 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def create_supabase_client() -> supabase.Client:
-    """Create and return a Supabase client."""
+async def create_supabase_client() -> AsyncClient:
+    """Create and return a Supabase async client."""
     url = settings.supabase_url
     key = settings.supabase_service_key
     
     if not url or not key:
         raise ValueError("SUPABASE_URL or SUPABASE_SERVICE_KEY not set in environment")
     
-    return supabase.Client(url, key)
+    return await acreate_client(url, key)
 
 
-async def get_board(client: supabase.Client, board_id: str) -> dict | None:
+async def get_board(client: AsyncClient, board_id: str) -> dict | None:
     """Fetch a single board by ID."""
-    def _fetch():
-        return client.table("boards").select("*").eq("id", board_id).execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("boards").select("*").eq("id", board_id).execute()
     
     if result.data and len(result.data) > 0:
         return result.data[0]
     return None
 
 
-async def get_all_boards(client: supabase.Client) -> list[dict]:
+async def get_all_boards(client: AsyncClient) -> list[dict]:
     """Fetch all boards from Supabase."""
-    def _fetch():
-        return client.table("boards").select("*").order("name").execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("boards").select("*").order("name").execute()
     return result.data if result.data else []
 
 
-async def get_boards_by_name(client: supabase.Client, name: str) -> list[dict]:
+async def get_boards_by_name(client: AsyncClient, name: str) -> list[dict]:
     """Fetch boards by name (case-insensitive)."""
-    def _fetch():
-        return client.table("boards").select("*").ilike("name", f"%{name}%").order("name").execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    result = await client.table("boards").select("*").ilike("name", f"%{name}%").order("name").execute()
     return result.data if result.data else []
 
 
 async def upsert_board(
-    client: supabase.Client,
+    client: AsyncClient,
     board_id: str,
     name: str,
     description: str | None = None
@@ -87,16 +78,13 @@ async def upsert_board(
     if description:
         board_record["description"] = description
     
-    def _upsert():
-        return client.table("boards").upsert(board_record).execute()
-    
-    result = await asyncio.get_event_loop().run_in_executor(None, _upsert)
+    result = await client.table("boards").upsert(board_record).execute()
     return result.data[0] if result.data else board_record
 
 
 async def add_board_async(name: str, description: str | None) -> None:
     """Add a new board."""
-    client = create_supabase_client()
+    client = await create_supabase_client()
     
     # Generate a random UUID for the board (root entity)
     board_id = str(uuid.uuid4())
@@ -120,7 +108,7 @@ async def add_board_async(name: str, description: str | None) -> None:
 
 async def get_board_async(board_id: str | None, all_boards: bool, name: str | None) -> None:
     """Get board(s) from database."""
-    client = create_supabase_client()
+    client = await create_supabase_client()
     
     if all_boards or name:
         if name:
