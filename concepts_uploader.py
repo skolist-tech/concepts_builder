@@ -55,7 +55,8 @@ def get_csv_files(input_dir: Path) -> List[Path]:
 
 async def upload_concepts_from_csv(
     client: supabase.Client,
-    csv_path: Path
+    csv_path: Path,
+    subject_id_override: str | None = None
 ) -> Dict[str, int]:
     """
     Upload concepts from a CSV file to Supabase.
@@ -65,6 +66,7 @@ async def upload_concepts_from_csv(
     Args:
         client: Supabase client instance.
         csv_path: Path to the concepts CSV file.
+        subject_id_override: Optional subject ID to use instead of the one in the CSV.
     
     Returns:
         Statistics dictionary with upload results.
@@ -74,7 +76,7 @@ async def upload_concepts_from_csv(
     # Load CSV with UUIDs
     data = load_csv_with_uuids(str(csv_path))
     
-    subject_id = data["subject_id"]
+    subject_id = subject_id_override if subject_id_override else data["subject_id"]
     chapter_data = data["chapter"]
     topics_data = data["topics"]
     concepts_data = data["concepts"]
@@ -163,10 +165,12 @@ async def upload_concepts_from_csv(
     }
 
 
-async def upload_all_concepts(input_dir: Path) -> None:
+async def upload_all_concepts(input_dir: Path, subject_id: str | None = None) -> None:
     """Upload all concept CSVs from the input directory."""
     csv_files = get_csv_files(input_dir)
     logger.info(f"Found {len(csv_files)} concept CSV files to upload")
+    if subject_id:
+        logger.info(f"Using subject ID override: {subject_id}")
     
     client = create_supabase_client()
     
@@ -183,7 +187,7 @@ async def upload_all_concepts(input_dir: Path) -> None:
         logger.info(f"[{i}/{len(csv_files)}] Uploading: {csv_path.name}")
         
         try:
-            stats = await upload_concepts_from_csv(client, csv_path)
+            stats = await upload_concepts_from_csv(client, csv_path, subject_id)
             total_chapters += stats["chapters"]
             total_topics += stats["topics"]
             total_concepts += stats["concepts"]
@@ -235,14 +239,21 @@ def main():
         required=True,
         help="Directory containing concept CSV files"
     )
+    parser.add_argument(
+        "--subject-id",
+        type=str,
+        required=False,
+        help="Subject UUID to use (overrides subject_id from CSV files)"
+    )
     
     args = parser.parse_args()
     input_dir = Path(args.input_dir)
+    subject_id = args.subject_id
     
     logger.info(f"Input directory: {input_dir}")
     
     try:
-        asyncio.run(upload_all_concepts(input_dir))
+        asyncio.run(upload_all_concepts(input_dir, subject_id))
     except (FileNotFoundError, ValueError) as e:
         logger.error(str(e))
         sys.exit(1)
