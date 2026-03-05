@@ -1,12 +1,15 @@
-You are provided with a chapter pdf from a mathematics textbook and a list of concepts from that chapter. Your task is to identify and extract all exercises from the chapter PDF, also wherever possible, link each exercise to the relevant concept(s) from the provided list.
-Don't take solved examples, only take exercises.
+You are provided with a chapter pdf from a hc verma concepts of physics textbook and a list of concepts from that chapter.
+Your task is to identify and extract all excercise questions from the chapter PDF,
+also wherever possible, link each exercise question to the relevant concept(s) from the provided list.
+Don't take solved example, only exercise question.
 
 STRICT INSTRUCTIONS:
 - Use ONLY the information present in the chapter PDF.
 - DO NOT use prior knowledge or add any external information.
-- If for an exercise, Figure or Image is referenced or needed, then flag it as 1 in the is_image_needed field.
-  Only flag if image is in the question related fields, if figure draw etc. if required in answer, then don't flag it as 1.
-- The mapping of the concepts should be word to word from the provided concepts list. Don't change the wording of any concepts, it will lead to mismatch during later processing. Strictly follow this, not even a extra blankspace is permitted for concepts mapping
+- If for an exercise question, Figure or Image is referenced or needed, then flag it as 1 in the is_image_needed field.
+- You also try to draw that image in the svg field.
+- The mapping of the concepts should be word to word from the provided concepts list. 
+  Don't change the wording of any concepts, it will lead to mismatch during later processing.
 
 
 OUTPUT RULES:
