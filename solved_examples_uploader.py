@@ -98,16 +98,18 @@ def get_json_files(input_dir: Path) -> List[Path]:
 
 async def fetch_concept_id_mapping(
     client: AsyncClient,
-    subject_id: str
+    chapter_id: str
 ) -> Dict[str, str]:
-    """Fetch concept name to ID mapping for a subject."""
+    """Fetch concept name to ID mapping for a chapter."""
     concept_to_id = {}
     
     try:
+        # Filter by chapter_id (one level deep) instead of subject_id (two levels deep)
+        # Supabase PostgREST doesn't support filtering on deeply nested relationships
         response = await (
             client.table("concepts")
-            .select("id, name, topics!inner(chapters!inner(subject_id))")
-            .eq("topics.chapters.subject_id", subject_id)
+            .select("id, name, topics!inner(chapter_id)")
+            .eq("topics.chapter_id", chapter_id)
             .execute()
         )
         
@@ -115,7 +117,7 @@ async def fetch_concept_id_mapping(
             for concept in response.data:
                 concept_to_id[concept['name']] = concept['id']
         else:
-            logger.warning(f"No concepts found for subject_id {subject_id}")
+            logger.warning(f"No concepts found for chapter_id {chapter_id}")
             
     except Exception as e:
         logger.error(f"Failed to fetch concepts: {e}")
@@ -200,12 +202,14 @@ async def upload_solved_examples_from_json(
     
     if not subject_id:
         raise ValueError(f"Missing subject_id in JSON - regenerate with solved_examples_builder")
+    if not chapter_id:
+        raise ValueError(f"Missing chapter_id in JSON - regenerate with solved_examples_builder")
     
     logger.info(f"Found {len(questions)} solved examples for chapter: {chapter_name}")
     
-    # Fetch concept mapping
-    concept_to_id = await fetch_concept_id_mapping(client, subject_id)
-    
+    # Fetch concept mapping by chapter_id (not subject_id - Supabase doesn't support deeply nested filters)
+    concept_to_id = await fetch_concept_id_mapping(client, chapter_id)
+    logger.debug(f"Fetched {len(concept_to_id)} concepts for chapter_id {chapter_id}")
     # Build question records and concept maps
     questions_by_id = {}
     concept_maps_by_id = {}
