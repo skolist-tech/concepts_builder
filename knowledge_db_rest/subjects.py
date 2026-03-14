@@ -31,7 +31,7 @@ async def get_subject_by_id(client: AsyncClient, subject_id: str) -> None:
 
 async def get_all_subjects(client: AsyncClient) -> None:
     """Fetch all subjects from Supabase."""
-    response = await client.table("subjects").select("*").order("name").execute()
+    response = await client.table("subjects").select("*, school_classes(name, boards(name))").order("name").execute()
     subjects = response.data if response.data else []
 
     title = "All Subjects"
@@ -41,22 +41,26 @@ async def get_all_subjects(client: AsyncClient) -> None:
         return
         
     print()
-    print("=" * 80)
+    print("=" * 130)
     print(title)
-    print("=" * 80)
-    print(f"{'ID':<40} {'Name':<20} {'Description':<20}")
-    print("-" * 80)
+    print("=" * 130)
+    print(f"{'ID':<40} {'Name':<20} {'Class':<20} {'Board':<20} {'Description':<20}")
+    print("-" * 130)
     for subject in subjects:
+        school_class = subject.get("school_classes") or {}
+        class_name = school_class.get("name", "N/A")
+        board = school_class.get("boards") or {}
+        board_name = board.get("name", "N/A") if isinstance(board, dict) else "N/A"
         desc = subject.get("description", "") or ""
         desc = desc[:17] + "..." if len(desc) > 20 else desc
-        print(f"{subject['id']:<40} {subject['name']:<20} {desc:<20}")
-    print("=" * 80)
+        print(f"{subject['id']:<40} {subject['name']:<20} {class_name:<20} {board_name:<20} {desc:<20}")
+    print("=" * 130)
     print(f"Total: {len(subjects)} subject(s)")
     return None
 
 async def get_all_subjects_by_name(client: AsyncClient, name: str) -> None:
     """Fetch subjects by name (case-insensitive)."""
-    response = await client.table("subjects").select("*").ilike("name", f"%{name}%").order("name").execute()
+    response = await client.table("subjects").select("*, school_classes(name, boards(name))").ilike("name", f"%{name}%").order("name").execute()
     subjects = response.data if response.data else []
 
     title = f"Subjects matching '{name}'"
@@ -66,16 +70,20 @@ async def get_all_subjects_by_name(client: AsyncClient, name: str) -> None:
         return
         
     print()
-    print("=" * 80)
+    print("=" * 130)
     print(title)
-    print("=" * 80)
-    print(f"{'ID':<40} {'Name':<20} {'Description':<20}")
-    print("-" * 80)
+    print("=" * 130)
+    print(f"{'ID':<40} {'Name':<20} {'Class':<20} {'Board':<20} {'Description':<20}")
+    print("-" * 130)
     for subject in subjects:
+        school_class = subject.get("school_classes") or {}
+        class_name = school_class.get("name", "N/A")
+        board = school_class.get("boards") or {}
+        board_name = board.get("name", "N/A") if isinstance(board, dict) else "N/A"
         desc = subject.get("description", "") or ""
         desc = desc[:17] + "..." if len(desc) > 20 else desc
-        print(f"{subject['id']:<40} {subject['name']:<20} {desc:<20}")
-    print("=" * 80)
+        print(f"{subject['id']:<40} {subject['name']:<20} {class_name:<20} {board_name:<20} {desc:<20}")
+    print("=" * 130)
     print(f"Total: {len(subjects)} subject(s)")
     return None
 
