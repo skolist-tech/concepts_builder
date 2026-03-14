@@ -2,6 +2,7 @@ import sys
 import logging
 
 from supabase import AsyncClient
+from utils.uuid_generator import generate_subject_id
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +79,24 @@ async def get_all_subjects_by_name(client: AsyncClient, name: str) -> None:
     print(f"Total: {len(subjects)} subject(s)")
     return None
 
-async def upsert_subject(client: AsyncClient, subject_id: str, name: str, description: str | None = None) -> None:
-    """Upsert subject record to Supabase."""
+async def upsert_subject(
+    client: AsyncClient,
+    name: str,
+    school_class_id: str,
+    subject_id: str | None = None,
+    description: str | None = None,
+) -> None:
+    """Upsert subject record to Supabase.
+
+    If subject_id is not provided, generate a deterministic UUID5 using
+    school_class_id as namespace and subject name as seed.
+    """
+    resolved_subject_id = subject_id or generate_subject_id(school_class_id, name)
+
     subject_record = {
-        "id": subject_id,
+        "id": resolved_subject_id,
         "name": name,
+        "school_class_id": school_class_id,
         "description": description,
     }
     
@@ -97,12 +111,13 @@ async def upsert_subject(client: AsyncClient, subject_id: str, name: str, descri
     print("=" * 50)
     print("Subject Upserted Successfully")
     print("=" * 50)
-    print(f"Subject ID:     {subject_id}")
+    print(f"Subject ID:     {resolved_subject_id}")
     print(f"Subject Name:   {name}")
+    print(f"Class ID:       {school_class_id}")
     if description:
         print(f"Description:    {description}")
     print("=" * 50)
 
-    logger.info(f"Upserted subject: {name} (id: {subject_id})")
+    logger.info(f"Upserted subject: {name} (id: {resolved_subject_id})")
     return None
 

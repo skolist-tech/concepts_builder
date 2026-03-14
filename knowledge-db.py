@@ -176,17 +176,45 @@ async def handle_subject_get(args) -> None:
 async def handle_subject_add(args) -> None:
     """Handle subject add subcommand."""
     client = await create_supabase_client()
-    
-    if not args.id:
-        print("Error: --id is required (subject ID)", file=sys.stderr)
+
+    if not args.id and not args.school_class_id:
+        print("Error: --id or --school-class-id is required", file=sys.stderr)
         sys.exit(1)
     if not args.name:
         print("Error: --name is required", file=sys.stderr)
         sys.exit(1)
-    if not validate_uuid(args.id):
+
+    if args.id and not validate_uuid(args.id):
         print(f"Error: Invalid UUID: {args.id}", file=sys.stderr)
         sys.exit(1)
-    await upsert_subject(client, args.id, args.name, args.description)
+
+    if args.school_class_id and not validate_uuid(args.school_class_id):
+        print(f"Error: Invalid school-class-id UUID: {args.school_class_id}", file=sys.stderr)
+        sys.exit(1)
+
+    school_class_id = args.school_class_id
+    if school_class_id is None and args.id is not None:
+        # Keep backward compatibility when users provide explicit subject IDs only.
+        # This works only if the existing record already has school_class_id in DB.
+        existing = await client.table("subjects").select("school_class_id").eq("id", args.id).execute()
+        if not existing.data:
+            print(
+                "Error: --school-class-id is required when creating a new subject without an existing --id record",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        school_class_id = existing.data[0].get("school_class_id")
+        if not school_class_id:
+            print("Error: Existing subject record has no school_class_id", file=sys.stderr)
+            sys.exit(1)
+
+    await upsert_subject(
+        client,
+        name=args.name,
+        school_class_id=school_class_id,
+        subject_id=args.id,
+        description=args.description,
+    )
 
 
 # ============================================================================
@@ -252,7 +280,8 @@ def main():
     
     # subject add
     subject_add = subject_subparsers.add_parser("add", help="Add a new subject")
-    subject_add.add_argument("--id", type=str, required=True, help="Subject UUID")
+    subject_add.add_argument("--id", type=str, help="Subject UUID (optional; auto-generated if omitted)")
+    subject_add.add_argument("--school-class-id", type=str, help="School class UUID (required to auto-generate deterministic subject ID)")
     subject_add.add_argument("--name", type=str, required=True, help="Subject name")
     subject_add.add_argument("--description", type=str, help="Subject description")
     
